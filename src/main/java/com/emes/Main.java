@@ -1,21 +1,40 @@
 package com.emes;
 
-import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 
 public class Main {
 
-  public static void main(String[] args)
-      throws InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException,
-      IOException, NoSuchAlgorithmException, BadPaddingException, InvalidKeySpecException,
-      InvalidKeyException {
+  public static void main(String[] args) {
+    var options = new Options();
 
-    new MainRunner().run(args);
+    Option password = Option.builder("password")
+        .argName("password")
+        .hasArg()
+        .desc("Hashes file encryption password")
+        .build();
+
+    Option directory = Option.builder("directory")
+        .argName("directory")
+        .hasArg()
+        .desc("Root directory for the files to have their hashes calculated")
+        .build();
+
+    options.addOption(password);
+    options.addOption(directory);
+
+    CommandLineParser parser = new DefaultParser();
+    try {
+      CommandLine line = parser.parse(options, args);
+      new MainRunner().run(line.getOptionValue(password), line.getOptionValue(directory));
+
+    } catch (ParseException exp) {
+      // oops, something went wrong
+      System.err.println("Parsing failed.  Reason: " + exp.getMessage());
+    }
   }
 }

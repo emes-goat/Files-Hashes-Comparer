@@ -1,20 +1,14 @@
 package com.emes;
 
 import java.nio.ByteBuffer;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.security.spec.InvalidKeySpecException;
 import java.util.Objects;
-import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import lombok.SneakyThrows;
 
 public class AES {
 
@@ -28,11 +22,8 @@ public class AES {
   private static final Integer AAD_LENGTH = 12;
   private static final Integer PASSWORD_SALT_LENGTH = 16;
 
-  public byte[] encrypt(char[] password, byte[] content)
-      throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException,
-      BadPaddingException, InvalidAlgorithmParameterException, InvalidKeyException,
-      InvalidKeySpecException {
-
+  @SneakyThrows
+  public byte[] encrypt(char[] password, byte[] content) {
     Objects.requireNonNull(password);
     Objects.requireNonNull(content);
     Precondition.require(password.length > 0);
@@ -58,13 +49,12 @@ public class AES {
     return joinArrays(passwordSalt, aesSalt, aad, ciphertext);
   }
 
-  public byte[] decrypt(char[] password, byte[] aesResult)
-      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException,
-      InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException {
-
+  @SneakyThrows
+  public byte[] decrypt(char[] password, byte[] aesResult) {
     Objects.requireNonNull(password);
     Objects.requireNonNull(aesResult);
     Precondition.require(password.length > 0);
+    Precondition.require(aesResult.length > 0);
 
     ByteBuffer byteBuffer = ByteBuffer.wrap(aesResult);
 
@@ -91,9 +81,8 @@ public class AES {
     return cipher.doFinal(ciphertext);
   }
 
-  private byte[] getKey(char[] password, byte[] salt)
-      throws NoSuchAlgorithmException, InvalidKeySpecException {
-
+  @SneakyThrows
+  private byte[] getKey(char[] password, byte[] salt) {
     var derivationSpec =
         new PBEKeySpec(password, salt, KEY_DERIVATION_ITERATIONS, AES_KEY_SIZE);
     return SecretKeyFactory.getInstance(KEY_DERIVATION_FUNCTION).generateSecret(derivationSpec)

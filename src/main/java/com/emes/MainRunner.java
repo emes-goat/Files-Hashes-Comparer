@@ -2,40 +2,31 @@ package com.emes;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import lombok.SneakyThrows;
 
 public class MainRunner {
 
   private final Serializer serializer = new Serializer();
   private final AES aes = new AES();
   private final ChangedFiles changedFiles = new ChangedFiles();
+  private final static String HASHES_FILE_NAME = ".hashes";
 
-  public void run(String[] args)
-      throws InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException,
-      IOException, NoSuchAlgorithmException, BadPaddingException, InvalidKeySpecException,
-      InvalidKeyException {
+  @SneakyThrows
+  public void run(String password, String directory) {
+    Precondition.require(!password.isBlank(), "Password can't be blank");
+    Precondition.require(!directory.isBlank(), "Directory can't be blank");
 
-    if (args.length != 2) {
-      throw new RuntimeException("Invalid number of arguments");
-    }
-    var password = args[0];
-    var rootDirectory = Paths.get(args[1]);
-    if (Files.notExists(rootDirectory)) {
-      throw new RuntimeException("Root directory doesn't exist");
-    }
+    var rootDirectory = tryConvertDirectory(directory);
+    Precondition.require(Files.exists(rootDirectory), "Directory doesn't exist");
+    Precondition.require(Files.isDirectory(rootDirectory), "Directory isn't an directory");
 
-    var resultsFile = rootDirectory.resolve(".hashes");
+    var resultsFile = rootDirectory.resolve(HASHES_FILE_NAME);
     var now = Instant.now();
     System.out.println("Calculating hashes");
     List<HashedFile> currentResult = new FileTreeHasher().getHashes(now, rootDirectory);
@@ -50,8 +41,6 @@ public class MainRunner {
     }
 
     // TODO Close the application with error when there is a changed file
-    // TODO add lombok to handle long list of exceptions
-    // TODO add CLI library to properly handle program arguments
     // TODO add more test coverage
     // TODO use file size for file checking
     // TODO use logger to handle colors in CLI
@@ -59,10 +48,16 @@ public class MainRunner {
     saveCurrent(currentResult, password, resultsFile);
   }
 
+  private Path tryConvertDirectory(String directory) {
+    try {
+      return Paths.get(directory);
+    } catch (InvalidPathException e) {
+      throw new IllegalArgumentException(String.format("%s isn't a path", directory));
+    }
+  }
+
   private void saveCurrent(List<HashedFile> currentResult, String password, Path resultsFile)
-      throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException,
-      IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException,
-      InvalidKeySpecException, InvalidKeyException {
+      throws IOException {
 
     var serialized = serializer.serialize(currentResult);
     var encrypted = aes.encrypt(password.toCharArray(), serialized);
@@ -70,9 +65,7 @@ public class MainRunner {
   }
 
   private List<HashedFile> readPrevious(String password, Path resultsFile)
-      throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException,
-      IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException,
-      InvalidKeySpecException, InvalidKeyException {
+      throws IOException {
 
     if (Files.exists(resultsFile)) {
       System.out.println("Previous exists");
