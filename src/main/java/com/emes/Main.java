@@ -33,8 +33,7 @@ public class Main {
       new MainRunner().run(line.getOptionValue(password), line.getOptionValue(directory));
 
     } catch (ParseException exp) {
-      // oops, something went wrong
-      System.err.println("Parsing failed.  Reason: " + exp.getMessage());
+      System.err.println("Parsing failed. Reason: " + exp.getMessage());
     }
   }
 }
