@@ -19,27 +19,36 @@ class HashesCalculatorTest {
   private static final Path fileBName = Paths.get("bfile");
 
   @Test
-  public void happyPath() throws IOException {
+  public void happyPath() throws IOException, InterruptedException {
     cleanup();
-
+    var hashesCalculator = new HashesCalculator();
     Files.createDirectory(directory);
+
+    Files.writeString(directory.resolve(fileAName), "Something");
+    hashesCalculator.calculate(directory);
+    var result = hashesCalculator.compare(directory);
+    assertEquals(0, result.size());
+
+    Thread.sleep(1000);
+
     var fileAContent = "Welcome to the jungle";
     var fileBContent = "Soft kitty warm kitty";
     Files.writeString(directory.resolve(fileAName), fileAContent);
     Files.writeString(directory.resolve(fileBName), fileBContent);
+    hashesCalculator.calculate(directory);
+    result = hashesCalculator.compare(directory);
+    assertEquals(1, result.size());
+    assertEquals(fileAName, result.getFirst());
 
-    var mainRunner = new HashesCalculator();
-    mainRunner.calculate(directory);
+    Thread.sleep(1000);
 
     //Doft instead of Soft
     var fileBContentChanged = "Doft kitty warm kitty";
     Files.writeString(directory.resolve(fileBName), fileBContentChanged);
-    mainRunner.calculate(directory);
-
-    var hashesComparer = new HashesComparer();
-    hashesComparer.compare(directory);
-
-    assertEquals(1, 1);
+    hashesCalculator.calculate(directory);
+    result = hashesCalculator.compare(directory);
+    assertEquals(1, result.size());
+    assertEquals(fileBName, result.getFirst());
   }
 
   @AfterAll

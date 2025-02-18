@@ -9,6 +9,7 @@ import static org.hibernate.cfg.JdbcSettings.JAKARTA_JDBC_USER;
 import static org.hibernate.cfg.JdbcSettings.SHOW_SQL;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.AvailableSettings;
@@ -17,37 +18,42 @@ import org.hibernate.tool.schema.Action;
 
 public class Database {
 
-  private final Configuration configuration = new Configuration()
-      .addAnnotatedClass(HashedFile.class)
-      .setProperty(AvailableSettings.JAKARTA_HBM2DDL_DATABASE_ACTION, Action.UPDATE)
-      .setProperty(JAKARTA_JDBC_USER, "sa")
-      .setProperty(JAKARTA_JDBC_PASSWORD, "")
-      .setProperty(HIKARI_MAX_SIZE, 1)
-      .setProperty(SHOW_SQL, false)
-      .setProperty(FORMAT_SQL, false)
-      .setProperty(HIGHLIGHT_SQL, false);
+  private final Configuration configuration;
 
-  public void saveAll(List<HashedFile> hashes, Path databaseFile) {
-    configuration.setProperty(JAKARTA_JDBC_URL, "jdbc:h2:./" + databaseFile);
+  public Database(Path databaseFile) {
+    configuration = new Configuration()
+        .addAnnotatedClass(HashedFile.class)
+        .setProperty(JAKARTA_JDBC_URL, "jdbc:h2:./" + databaseFile)
+        .setProperty(AvailableSettings.JAKARTA_HBM2DDL_DATABASE_ACTION, Action.UPDATE)
+        .setProperty(JAKARTA_JDBC_USER, "sa")
+        .setProperty(JAKARTA_JDBC_PASSWORD, "")
+        .setProperty(HIKARI_MAX_SIZE, 1)
+        .setProperty(SHOW_SQL, false)
+        .setProperty(FORMAT_SQL, false)
+        .setProperty(HIGHLIGHT_SQL, false);
+  }
 
+  public void saveAll(List<HashedFile> hashes) {
     try (SessionFactory sessionFactory = configuration.buildSessionFactory()) {
       sessionFactory.inTransaction(session -> hashes.forEach(session::persist));
     }
   }
 
-  public List<HashedFile> findFilesFromLastTwoScans(Path databaseFile) {
-    configuration.setProperty(JAKARTA_JDBC_URL, "jdbc:h2:./" + databaseFile);
-
+  public List<HashedFile> findFilesFromLastTwoScans() {
     try (SessionFactory sessionFactory = configuration.buildSessionFactory()) {
+      var latestTimestamps = sessionFactory.fromTransaction(session ->
+          session.createSelectionQuery(
+                  "select distinct timestamp from HashedFile order by timestamp desc limit 2",
+                  Instant.class)
+              .getResultList()
+      );
+
       return sessionFactory.fromTransaction(session ->
           session.createSelectionQuery(
-                  "select path, hash, timestamp "
-                      + "from HashedFile "
-                      + "where timestamp in "
-                      + "(select distinct timestamp from HashedFile order by timestamp desc limit 2)",
+                  "select path, hash, timestamp from HashedFile where timestamp in (:timestamps)",
                   HashedFile.class)
-              .stream()
-              .toList());
+              .setParameter("timestamps", latestTimestamps)
+              .getResultList());
     }
   }
 }

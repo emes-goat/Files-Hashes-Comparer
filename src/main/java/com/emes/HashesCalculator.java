@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import lombok.SneakyThrows;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -20,7 +21,8 @@ import org.apache.logging.log4j.Logger;
 public class HashesCalculator {
 
   private static final int BUFFER_SIZE = 16384;
-  private static final Path DATABASE_FILE_NAME = Paths.get(".hashes");
+  private static final String DATABASE_FILE_NAME = ".hashes";
+  private static final Path IGNORE_FILE = Paths.get(".hashes.mv.db");
   private final Logger log = LogManager.getLogger();
 
   @SneakyThrows
@@ -30,20 +32,68 @@ public class HashesCalculator {
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
     var now = Instant.now();
-    var hashes = calculateHashes(directory, now, databasePath);
+    var hashes = calculateHashes(directory, now, directory.resolve(IGNORE_FILE));
 
-    new Database().saveAll(hashes, databasePath);
+    new Database(databasePath).saveAll(hashes);
   }
 
   @SneakyThrows
-  private List<HashedFile> calculateHashes(Path root, Instant timestamp, Path databasePath) {
+  public List<Path> compare(Path directory) {
+    Precondition.require(Files.exists(directory), "Directory " + directory + " does not exist");
+    Precondition.require(Files.isDirectory(directory),
+        "Directory " + directory + " is not a file");
+
+    var database = new Database(directory.resolve(DATABASE_FILE_NAME));
+
+    var filesFromLastTwoScans = database.findFilesFromLastTwoScans();
+    var howManyHashes = filesFromLastTwoScans.stream()
+        .map(it -> it.timestamp)
+        .distinct()
+        .sorted(Instant::compareTo)
+        .toList();
+
+    if (howManyHashes.size() != 2) {
+      log.info("Hashes weren't calculated 2 times. Can't compare two sets. Quitting");
+      return List.of();
+    }
+
+    var newer = filesFromLastTwoScans.stream()
+        .filter(it -> it.timestamp.equals(howManyHashes.getFirst()))
+        .toList();
+
+    var older = filesFromLastTwoScans.stream()
+        .filter(it -> it.timestamp.equals(howManyHashes.getLast()))
+        .toList();
+
+    return compareHashes(older, newer);
+  }
+
+  private List<Path> compareHashes(List<HashedFile> previousFiles, List<HashedFile> currentFiles) {
+    return currentFiles
+        .stream()
+        .map(currentFile ->
+            previousFiles
+                .stream()
+                .filter(previousFile ->
+                    currentFile.path.equals(previousFile.path) &&
+                        !currentFile.hash.equals(previousFile.hash))
+                .findFirst()
+                .orElse(null)
+        )
+        .filter(Objects::nonNull)
+        .map(it -> Paths.get(it.path))
+        .toList();
+  }
+
+  @SneakyThrows
+  private List<HashedFile> calculateHashes(Path root, Instant timestamp, Path database) {
     var fileHashes = new ArrayList<HashedFile>();
 
     Files.walkFileTree(root, new SimpleFileVisitor<>() {
       @Override
       public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
         if (Files.getLastModifiedTime(file).toInstant().isBefore(timestamp) &&
-            !file.equals(databasePath)) {
+            !file.equals(database)) {
 
           var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file),
               timestamp);
