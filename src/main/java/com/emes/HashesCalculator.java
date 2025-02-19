@@ -43,7 +43,7 @@ public class HashesCalculator {
     var filesFromLastTwoScans = new Database(
         directory.resolve(DATABASE_FILE_NAME)).findFilesFromLastTwoScans();
     var howManyHashes = filesFromLastTwoScans.stream()
-        .map(it -> it.timestamp)
+        .map(HashedFile::timestamp)
         .distinct()
         .sorted(Instant::compareTo)
         .toList();
@@ -54,11 +54,11 @@ public class HashesCalculator {
     }
 
     var newer = filesFromLastTwoScans.stream()
-        .filter(it -> it.timestamp.equals(howManyHashes.getFirst()))
+        .filter(it -> it.timestamp().equals(howManyHashes.getFirst()))
         .toList();
 
     var older = filesFromLastTwoScans.stream()
-        .filter(it -> it.timestamp.equals(howManyHashes.getLast()))
+        .filter(it -> it.timestamp().equals(howManyHashes.getLast()))
         .toList();
 
     var changedHashes = compareHashes(older, newer);
@@ -78,13 +78,13 @@ public class HashesCalculator {
             previousFiles
                 .stream()
                 .filter(previousFile ->
-                    currentFile.path.equals(previousFile.path) &&
-                        !currentFile.hash.equals(previousFile.hash))
+                    currentFile.path().equals(previousFile.path()) &&
+                        !currentFile.hash().equals(previousFile.hash()))
                 .findFirst()
                 .orElse(null)
         )
         .filter(Objects::nonNull)
-        .map(it -> Paths.get(it.path))
+        .map(it -> Paths.get(it.path()))
         .toList();
   }
 

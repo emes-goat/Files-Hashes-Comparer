@@ -1,57 +1,58 @@
 package com.emes;
 
-import static org.hibernate.cfg.JdbcSettings.AUTOCOMMIT;
-import static org.hibernate.cfg.JdbcSettings.FORMAT_SQL;
-import static org.hibernate.cfg.JdbcSettings.HIGHLIGHT_SQL;
-import static org.hibernate.cfg.JdbcSettings.JAKARTA_JDBC_URL;
-import static org.hibernate.cfg.JdbcSettings.POOL_SIZE;
-import static org.hibernate.cfg.JdbcSettings.SHOW_SQL;
-
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import org.hibernate.SessionFactory;
-import org.hibernate.cfg.AvailableSettings;
-import org.hibernate.cfg.Configuration;
-import org.hibernate.tool.schema.Action;
+import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.core.mapper.reflect.ConstructorMapper;
 
 public class Database {
 
-  private final Configuration configuration;
+  private final Jdbi jdbi;
 
   public Database(Path databaseFile) {
-    configuration = new Configuration()
-        .addAnnotatedClass(HashedFile.class)
-        .setProperty(JAKARTA_JDBC_URL, "jdbc:sqlite:" + databaseFile)
-        .setProperty(AvailableSettings.JAKARTA_HBM2DDL_DATABASE_ACTION, Action.UPDATE)
-        .setProperty(SHOW_SQL, false)
-        .setProperty(FORMAT_SQL, false)
-        .setProperty(HIGHLIGHT_SQL, false)
-        .setProperty(AUTOCOMMIT, true)
-        .setProperty(POOL_SIZE, 1);
+    jdbi = Jdbi.create("jdbc:sqlite:" + databaseFile);
+    jdbi.withHandle(handle -> handle.execute("""
+        CREATE TABLE IF NOT EXISTS hashed_file
+        (
+          path      varchar(255),
+          hash      varchar(64),
+          timestamp timestamp,
+          PRIMARY KEY (path, hash, timestamp)
+        );
+        """));
   }
 
   public void saveAll(List<HashedFile> hashes) {
-    try (SessionFactory sessionFactory = configuration.buildSessionFactory()) {
-      sessionFactory.inTransaction(session -> hashes.forEach(session::persist));
-    }
+    jdbi.withHandle(handle -> {
+      var batch = handle.prepareBatch("INSERT INTO hashed_file VALUES(:path, :hash, :timestamp)");
+
+      hashes.forEach(it ->
+          batch.bind("path", it.path())
+              .bind("hash", it.hash())
+              .bind("timestamp", it.timestamp())
+              .add()
+      );
+
+      return batch.execute();
+    });
   }
 
   public List<HashedFile> findFilesFromLastTwoScans() {
-    try (SessionFactory sessionFactory = configuration.buildSessionFactory()) {
-      var latestTimestamps = sessionFactory.fromTransaction(session ->
-          session.createSelectionQuery(
-                  "select distinct timestamp from HashedFile order by timestamp desc limit 2",
-                  Instant.class)
-              .getResultList()
-      );
+    return jdbi.withHandle(handle -> {
+      var latestTimestamps = handle.select(
+              "SELECT DISTINCT timestamp FROM hashed_file ORDER BY TIMESTAMP DESC LIMIT 2")
+          .mapTo(Instant.class)
+          .list();
 
-      return sessionFactory.fromTransaction(session ->
-          session.createSelectionQuery(
-                  "select path, hash, timestamp from HashedFile where timestamp in (:timestamps)",
-                  HashedFile.class)
-              .setParameter("timestamps", latestTimestamps)
-              .getResultList());
-    }
+      return handle
+          .registerRowMapper(HashedFile.class, ConstructorMapper.of(HashedFile.class))
+          .select(
+              "SELECT * FROM hashed_file WHERE timestamp = :newer OR timestamp = :older")
+          .bind("newer", latestTimestamps.getFirst())
+          .bind("older", latestTimestamps.getLast())
+          .mapTo(HashedFile.class)
+          .list();
+    });
   }
 }
