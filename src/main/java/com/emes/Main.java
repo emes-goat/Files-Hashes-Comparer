@@ -26,7 +26,8 @@ public class Main {
 
       if (calculate) {
         hashesCalculator.calculate(directory);
-      } else if (compare) {
+      }
+      if (compare) {
         hashesCalculator.compare(directory);
       }
     } catch (ParseException exp) {

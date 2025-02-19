@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 class HashesCalculatorTest {
 
-  private static final Path directory = Paths.get("hellokitty");
+  private static final Path directory = Paths.get("./hellokitty");
   private static final Path fileAName = Paths.get("afile");
   private static final Path fileBName = Paths.get("bfile");
 

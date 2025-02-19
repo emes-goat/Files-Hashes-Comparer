@@ -34,6 +34,7 @@ public class HashesCalculator {
     var hashes = calculateHashes(directory, now);
 
     new Database(databasePath).saveAll(hashes);
+    log.info("Finished");
   }
 
   @SneakyThrows
@@ -63,7 +64,12 @@ public class HashesCalculator {
         .toList();
 
     var changedHashes = compareHashes(older, newer);
-    changedHashes.forEach(it -> log.info("HASH CHANGED FOR: {}", it.toString()));
+    if (!changedHashes.isEmpty()) {
+      changedHashes.forEach(it -> log.info("HASH CHANGED FOR: {}", it.toString()));
+    } else {
+      log.info("No changes in hashes");
+    }
+
     return changedHashes;
   }
 

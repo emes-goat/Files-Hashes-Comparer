@@ -1,11 +1,10 @@
 package com.emes;
 
-import static org.hibernate.cfg.HikariCPSettings.HIKARI_MAX_SIZE;
+import static org.hibernate.cfg.JdbcSettings.AUTOCOMMIT;
 import static org.hibernate.cfg.JdbcSettings.FORMAT_SQL;
 import static org.hibernate.cfg.JdbcSettings.HIGHLIGHT_SQL;
-import static org.hibernate.cfg.JdbcSettings.JAKARTA_JDBC_PASSWORD;
 import static org.hibernate.cfg.JdbcSettings.JAKARTA_JDBC_URL;
-import static org.hibernate.cfg.JdbcSettings.JAKARTA_JDBC_USER;
+import static org.hibernate.cfg.JdbcSettings.POOL_SIZE;
 import static org.hibernate.cfg.JdbcSettings.SHOW_SQL;
 
 import java.nio.file.Path;
@@ -23,14 +22,13 @@ public class Database {
   public Database(Path databaseFile) {
     configuration = new Configuration()
         .addAnnotatedClass(HashedFile.class)
-        .setProperty(JAKARTA_JDBC_URL, "jdbc:h2:./" + databaseFile)
+        .setProperty(JAKARTA_JDBC_URL, "jdbc:h2:" + databaseFile)
         .setProperty(AvailableSettings.JAKARTA_HBM2DDL_DATABASE_ACTION, Action.UPDATE)
-        .setProperty(JAKARTA_JDBC_USER, "sa")
-        .setProperty(JAKARTA_JDBC_PASSWORD, "")
-        .setProperty(HIKARI_MAX_SIZE, 1)
         .setProperty(SHOW_SQL, false)
         .setProperty(FORMAT_SQL, false)
-        .setProperty(HIGHLIGHT_SQL, false);
+        .setProperty(HIGHLIGHT_SQL, false)
+        .setProperty(AUTOCOMMIT, true)
+        .setProperty(POOL_SIZE, 1);
   }
 
   public void saveAll(List<HashedFile> hashes) {
