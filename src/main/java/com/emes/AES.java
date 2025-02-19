@@ -26,8 +26,8 @@ public class AES {
   public byte[] encrypt(char[] password, byte[] content) {
     Objects.requireNonNull(password);
     Objects.requireNonNull(content);
-    Precondition.require(password.length > 0);
-    Precondition.require(content.length > 0);
+    require(password.length > 0);
+    require(content.length > 0);
 
     var secureRandom = new SecureRandom();
     var aesSalt = new byte[AES_SALT_LENGTH];
@@ -53,8 +53,8 @@ public class AES {
   public byte[] decrypt(char[] password, byte[] aesResult) {
     Objects.requireNonNull(password);
     Objects.requireNonNull(aesResult);
-    Precondition.require(password.length > 0);
-    Precondition.require(aesResult.length > 0);
+    require(password.length > 0);
+    require(aesResult.length > 0);
 
     ByteBuffer byteBuffer = ByteBuffer.wrap(aesResult);
 
@@ -99,5 +99,11 @@ public class AES {
     result.put(ciphertext);
 
     return result.array();
+  }
+
+  private void require(boolean condition) {
+    if (!condition) {
+      throw new IllegalArgumentException("Illegal argument");
+    }
   }
 }

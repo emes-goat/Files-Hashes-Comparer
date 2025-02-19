@@ -26,7 +26,6 @@ public class HashesCalculator {
 
   @SneakyThrows
   public void calculate(Path directory) {
-    check(directory);
     log.info("Calculate hashes in {}", directory);
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
@@ -39,7 +38,6 @@ public class HashesCalculator {
 
   @SneakyThrows
   public List<Path> compare(Path directory) {
-    check(directory);
     log.info("Compare hashes in {}", directory);
 
     var filesFromLastTwoScans = new Database(
@@ -125,10 +123,5 @@ public class HashesCalculator {
 
       return HexFormat.of().formatHex(sha3.digest());
     }
-  }
-
-  private void check(Path directory) {
-    Precondition.require(Files.exists(directory), "Directory doesn't exist");
-    Precondition.require(Files.isDirectory(directory), "Directory isn't a directory");
   }
 }

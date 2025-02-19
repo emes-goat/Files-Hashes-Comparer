@@ -22,7 +22,7 @@ public class Database {
   public Database(Path databaseFile) {
     configuration = new Configuration()
         .addAnnotatedClass(HashedFile.class)
-        .setProperty(JAKARTA_JDBC_URL, "jdbc:h2:" + databaseFile)
+        .setProperty(JAKARTA_JDBC_URL, "jdbc:sqlite:" + databaseFile)
         .setProperty(AvailableSettings.JAKARTA_HBM2DDL_DATABASE_ACTION, Action.UPDATE)
         .setProperty(SHOW_SQL, false)
         .setProperty(FORMAT_SQL, false)
