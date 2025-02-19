@@ -22,7 +22,6 @@ public class HashesCalculator {
 
   private static final int BUFFER_SIZE = 16384;
   private static final String DATABASE_FILE_NAME = ".hashes";
-  private static final Path IGNORE_FILE = Paths.get(".hashes.mv.db");
   private final Logger log = LogManager.getLogger();
 
   @SneakyThrows
@@ -32,20 +31,18 @@ public class HashesCalculator {
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
     var now = Instant.now();
-    var hashes = calculateHashes(directory, now, directory.resolve(IGNORE_FILE));
+    var hashes = calculateHashes(directory, now);
 
     new Database(databasePath).saveAll(hashes);
   }
 
   @SneakyThrows
   public List<Path> compare(Path directory) {
-    Precondition.require(Files.exists(directory), "Directory " + directory + " does not exist");
-    Precondition.require(Files.isDirectory(directory),
-        "Directory " + directory + " is not a file");
+    check(directory);
+    log.info("Compare hashes in {}", directory);
 
-    var database = new Database(directory.resolve(DATABASE_FILE_NAME));
-
-    var filesFromLastTwoScans = database.findFilesFromLastTwoScans();
+    var filesFromLastTwoScans = new Database(
+        directory.resolve(DATABASE_FILE_NAME)).findFilesFromLastTwoScans();
     var howManyHashes = filesFromLastTwoScans.stream()
         .map(it -> it.timestamp)
         .distinct()
@@ -65,7 +62,9 @@ public class HashesCalculator {
         .filter(it -> it.timestamp.equals(howManyHashes.getLast()))
         .toList();
 
-    return compareHashes(older, newer);
+    var changedHashes = compareHashes(older, newer);
+    changedHashes.forEach(it -> log.info("HASH CHANGED FOR: {}", it.toString()));
+    return changedHashes;
   }
 
   private List<Path> compareHashes(List<HashedFile> previousFiles, List<HashedFile> currentFiles) {
@@ -86,14 +85,14 @@ public class HashesCalculator {
   }
 
   @SneakyThrows
-  private List<HashedFile> calculateHashes(Path root, Instant timestamp, Path database) {
+  private List<HashedFile> calculateHashes(Path root, Instant timestamp) {
     var fileHashes = new ArrayList<HashedFile>();
 
     Files.walkFileTree(root, new SimpleFileVisitor<>() {
       @Override
       public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
         if (Files.getLastModifiedTime(file).toInstant().isBefore(timestamp) &&
-            !file.equals(database)) {
+            !file.getFileName().toString().startsWith(".")) {
 
           var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file),
               timestamp);

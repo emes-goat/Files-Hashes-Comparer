@@ -3,8 +3,6 @@ package com.emes;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
@@ -12,27 +10,47 @@ import org.apache.commons.cli.ParseException;
 
 public class Main {
 
-  private final static HashesCalculator HASHES_CALCULATOR = new HashesCalculator();
+  private static final String OPTION_CALCULATE_NAME = "calculate";
+  private static final String OPTION_COMPARE_NAME = "compare";
+  private static final String OPTION_DIRECTORY_NAME = "directory";
 
   public static void main(String[] args) {
+    var parser = new DefaultParser();
+    var options = prepareCLIOptions();
+    try {
+      var parsedArguments = parser.parse(options, args);
+      var directory = tryConvertDirectory(parsedArguments.getOptionValue(OPTION_DIRECTORY_NAME));
+      var calculate = parsedArguments.hasOption(OPTION_CALCULATE_NAME);
+      var compare = parsedArguments.hasOption(OPTION_COMPARE_NAME);
+      var hashesCalculator = new HashesCalculator();
+
+      if (calculate) {
+        hashesCalculator.calculate(directory);
+      } else if (compare) {
+        hashesCalculator.compare(directory);
+      }
+    } catch (ParseException exp) {
+      System.err.println("Parsing failed. Reason: " + exp.getMessage());
+    }
+  }
+
+  private static Options prepareCLIOptions() {
     var options = new Options();
 
-    Option directory = Option.builder("directory")
-        .argName("directory")
+    Option calculate = new Option(OPTION_CALCULATE_NAME, "Calculate hashes");
+    Option compare = new Option(OPTION_COMPARE_NAME, "Compare hashes");
+
+    Option directory = Option.builder(OPTION_DIRECTORY_NAME)
+        .argName(OPTION_DIRECTORY_NAME)
         .hasArg()
         .desc("Root directory for the files to have their hashes calculated")
         .required()
         .build();
 
+    options.addOption(calculate);
+    options.addOption(compare);
     options.addOption(directory);
-
-    CommandLineParser parser = new DefaultParser();
-    try {
-      CommandLine line = parser.parse(options, args);
-      HASHES_CALCULATOR.calculate(tryConvertDirectory(line.getOptionValue(directory)));
-    } catch (ParseException exp) {
-      System.err.println("Parsing failed. Reason: " + exp.getMessage());
-    }
+    return options;
   }
 
   private static Path tryConvertDirectory(String directory) {
