@@ -25,36 +25,27 @@ public class HashesCalculator {
   private final Logger log = LogManager.getLogger();
 
   public List<Path> run(Path directory) {
-    var hashes = calculate(directory);
-    var changedHashes = compare(directory, hashes);
-    changedHashes.forEach(it -> log.info("HASH CHANGED FOR: {}", it.toString()));
+    log.info("Calculate hashes in {}", directory);
+    var currentHashes = calculateHashes(directory);
+    log.info("Calculated hashes for {} files", currentHashes.size());
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
-    new Database(databasePath).saveAll(hashes);
-    return changedHashes;
-  }
-
-  @SneakyThrows
-  private List<HashedFile> calculate(Path directory) {
-    log.info("Calculate hashes in {}", directory);
-
-    var now = Instant.now();
-    return calculateHashes(directory, now);
-  }
-
-  @SneakyThrows
-  private List<Path> compare(Path directory, List<HashedFile> currentHashes) {
-    log.info("Compare hashes in {}", directory);
-
-    var previousHashes = new Database(
-        directory.resolve(DATABASE_FILE_NAME)).readPreviousHashes();
-
+    var previousHashes = new Database(databasePath).readPreviousHashes();
+    List<Path> changedHashes = new ArrayList<>();
     if (previousHashes.isEmpty()) {
-      log.info("Hashes weren't calculated 2 times. Can't compare two sets. Quitting");
-      return List.of();
+      log.warn("Previous hashes is empty. Not comparing.");
+    } else {
+      changedHashes = compareHashes(previousHashes, currentHashes);
+      if (changedHashes.isEmpty()) {
+        log.info("OK - no changed hashes");
+      } else {
+        log.error("WARNING - HASH CHANGED!!!");
+        changedHashes.forEach(it -> log.error("HASH CHANGED FOR: {}", it.toString()));
+      }
     }
 
-    return compareHashes(previousHashes, currentHashes);
+    new Database(databasePath).saveAll(currentHashes);
+    return changedHashes;
   }
 
   private List<Path> compareHashes(List<HashedFile> previousFiles, List<HashedFile> currentFiles) {
@@ -75,8 +66,9 @@ public class HashesCalculator {
   }
 
   @SneakyThrows
-  private List<HashedFile> calculateHashes(Path root, Instant timestamp) {
+  private List<HashedFile> calculateHashes(Path root) {
     var fileHashes = new ArrayList<HashedFile>();
+    var timestamp = Instant.now();
 
     Files.walkFileTree(root, new SimpleFileVisitor<>() {
       @Override
@@ -84,8 +76,7 @@ public class HashesCalculator {
         if (Files.getLastModifiedTime(file).toInstant().isBefore(timestamp) &&
             !file.getFileName().toString().startsWith(".")) {
 
-          var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file),
-              timestamp);
+          var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file));
           fileHashes.add(hashedFile);
         }
         return FileVisitResult.CONTINUE;

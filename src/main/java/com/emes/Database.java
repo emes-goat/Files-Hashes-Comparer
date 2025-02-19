@@ -16,8 +16,7 @@ public class Database {
         (
           path      varchar(255),
           hash      varchar(64),
-          timestamp timestamp,
-          PRIMARY KEY (path, hash, timestamp)
+          PRIMARY KEY (path, hash)
         );
         """));
   }
@@ -26,12 +25,11 @@ public class Database {
     jdbi.withHandle(handle -> {
       handle.execute("DELETE FROM hashed_file");
 
-      var batch = handle.prepareBatch("INSERT INTO hashed_file VALUES(:path, :hash, :timestamp)");
+      var batch = handle.prepareBatch("INSERT INTO hashed_file VALUES(:path, :hash)");
 
       hashes.forEach(it ->
           batch.bind("path", it.path())
               .bind("hash", it.hash())
-              .bind("timestamp", it.timestamp())
               .add()
       );
 

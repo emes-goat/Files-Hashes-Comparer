@@ -28,7 +28,7 @@ class HashesCalculatorTest {
     var result = hashesCalculator.run(directory);
     assertEquals(0, result.size());
 
-    Thread.sleep(1000);
+    Thread.sleep(100);
 
     var fileAContent = "Welcome to the jungle";
     var fileBContent = "Soft kitty warm kitty";
@@ -38,7 +38,7 @@ class HashesCalculatorTest {
     assertEquals(1, result.size());
     assertEquals(fileAName, result.getFirst());
 
-    Thread.sleep(1000);
+    Thread.sleep(100);
 
     //Doft instead of Soft
     var fileBContentChanged = "Doft kitty warm kitty";
@@ -46,6 +46,11 @@ class HashesCalculatorTest {
     result = hashesCalculator.run(directory);
     assertEquals(1, result.size());
     assertEquals(fileBName, result.getFirst());
+
+    Thread.sleep(100);
+
+    result = hashesCalculator.run(directory);
+    assertEquals(0, result.size());
   }
 
   @AfterAll
