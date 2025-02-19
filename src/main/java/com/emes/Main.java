@@ -10,9 +10,7 @@ public class Main {
     require(Files.exists(directory), "Directory doesn't exist");
     require(Files.isDirectory(directory), "Directory isn't a directory");
 
-    var hashesCalculator = new HashesCalculator();
-    hashesCalculator.calculate(directory);
-    hashesCalculator.compare(directory);
+    new HashesCalculator().run(directory);
   }
 
   public static void require(boolean condition, String message) {

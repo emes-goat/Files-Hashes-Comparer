@@ -1,7 +1,6 @@
 package com.emes;
 
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.List;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.reflect.ConstructorMapper;
@@ -25,6 +24,8 @@ public class Database {
 
   public void saveAll(List<HashedFile> hashes) {
     jdbi.withHandle(handle -> {
+      handle.execute("DELETE FROM hashed_file");
+
       var batch = handle.prepareBatch("INSERT INTO hashed_file VALUES(:path, :hash, :timestamp)");
 
       hashes.forEach(it ->
@@ -38,21 +39,12 @@ public class Database {
     });
   }
 
-  public List<HashedFile> findFilesFromLastTwoScans() {
-    return jdbi.withHandle(handle -> {
-      var latestTimestamps = handle.select(
-              "SELECT DISTINCT timestamp FROM hashed_file ORDER BY TIMESTAMP DESC LIMIT 2")
-          .mapTo(Instant.class)
-          .list();
-
-      return handle
-          .registerRowMapper(HashedFile.class, ConstructorMapper.of(HashedFile.class))
-          .select(
-              "SELECT * FROM hashed_file WHERE timestamp = :newer OR timestamp = :older")
-          .bind("newer", latestTimestamps.getFirst())
-          .bind("older", latestTimestamps.getLast())
-          .mapTo(HashedFile.class)
-          .list();
-    });
+  public List<HashedFile> readPreviousHashes() {
+    return jdbi.withHandle(handle ->
+        handle.registerRowMapper(HashedFile.class, ConstructorMapper.of(HashedFile.class))
+            .select(
+                "SELECT * FROM hashed_file")
+            .mapTo(HashedFile.class)
+            .list());
   }
 }

@@ -24,51 +24,37 @@ public class HashesCalculator {
   private static final String DATABASE_FILE_NAME = ".hashes";
   private final Logger log = LogManager.getLogger();
 
-  @SneakyThrows
-  public void calculate(Path directory) {
-    log.info("Calculate hashes in {}", directory);
+  public List<Path> run(Path directory) {
+    var hashes = calculate(directory);
+    var changedHashes = compare(directory, hashes);
+    changedHashes.forEach(it -> log.info("HASH CHANGED FOR: {}", it.toString()));
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
-    var now = Instant.now();
-    var hashes = calculateHashes(directory, now);
-
     new Database(databasePath).saveAll(hashes);
-    log.info("Finished");
+    return changedHashes;
   }
 
   @SneakyThrows
-  public List<Path> compare(Path directory) {
+  private List<HashedFile> calculate(Path directory) {
+    log.info("Calculate hashes in {}", directory);
+
+    var now = Instant.now();
+    return calculateHashes(directory, now);
+  }
+
+  @SneakyThrows
+  private List<Path> compare(Path directory, List<HashedFile> currentHashes) {
     log.info("Compare hashes in {}", directory);
 
-    var filesFromLastTwoScans = new Database(
-        directory.resolve(DATABASE_FILE_NAME)).findFilesFromLastTwoScans();
-    var howManyHashes = filesFromLastTwoScans.stream()
-        .map(HashedFile::timestamp)
-        .distinct()
-        .sorted(Instant::compareTo)
-        .toList();
+    var previousHashes = new Database(
+        directory.resolve(DATABASE_FILE_NAME)).readPreviousHashes();
 
-    if (howManyHashes.size() != 2) {
+    if (previousHashes.isEmpty()) {
       log.info("Hashes weren't calculated 2 times. Can't compare two sets. Quitting");
       return List.of();
     }
 
-    var newer = filesFromLastTwoScans.stream()
-        .filter(it -> it.timestamp().equals(howManyHashes.getFirst()))
-        .toList();
-
-    var older = filesFromLastTwoScans.stream()
-        .filter(it -> it.timestamp().equals(howManyHashes.getLast()))
-        .toList();
-
-    var changedHashes = compareHashes(older, newer);
-    if (!changedHashes.isEmpty()) {
-      changedHashes.forEach(it -> log.info("HASH CHANGED FOR: {}", it.toString()));
-    } else {
-      log.info("No changes in hashes");
-    }
-
-    return changedHashes;
+    return compareHashes(previousHashes, currentHashes);
   }
 
   private List<Path> compareHashes(List<HashedFile> previousFiles, List<HashedFile> currentFiles) {

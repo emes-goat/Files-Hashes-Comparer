@@ -25,8 +25,7 @@ class HashesCalculatorTest {
     Files.createDirectory(directory);
 
     Files.writeString(directory.resolve(fileAName), "Something");
-    hashesCalculator.calculate(directory);
-    var result = hashesCalculator.compare(directory);
+    var result = hashesCalculator.run(directory);
     assertEquals(0, result.size());
 
     Thread.sleep(1000);
@@ -35,8 +34,7 @@ class HashesCalculatorTest {
     var fileBContent = "Soft kitty warm kitty";
     Files.writeString(directory.resolve(fileAName), fileAContent);
     Files.writeString(directory.resolve(fileBName), fileBContent);
-    hashesCalculator.calculate(directory);
-    result = hashesCalculator.compare(directory);
+    result = hashesCalculator.run(directory);
     assertEquals(1, result.size());
     assertEquals(fileAName, result.getFirst());
 
@@ -45,8 +43,7 @@ class HashesCalculatorTest {
     //Doft instead of Soft
     var fileBContentChanged = "Doft kitty warm kitty";
     Files.writeString(directory.resolve(fileBName), fileBContentChanged);
-    hashesCalculator.calculate(directory);
-    result = hashesCalculator.compare(directory);
+    result = hashesCalculator.run(directory);
     assertEquals(1, result.size());
     assertEquals(fileBName, result.getFirst());
   }
