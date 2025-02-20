@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
-import lombok.SneakyThrows;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -31,7 +30,7 @@ public class HashesCalculator {
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
     var previousHashes = new Database(databasePath).readPreviousHashes();
-    List<Path> changedHashes = new ArrayList<>();
+    List<Path> changedHashes = List.of();
     if (previousHashes.isEmpty()) {
       log.warn("Previous hashes is empty. Not comparing.");
     } else {
@@ -65,40 +64,46 @@ public class HashesCalculator {
         .toList();
   }
 
-  @SneakyThrows
   private List<HashedFile> calculateHashes(Path root) {
-    var fileHashes = new ArrayList<HashedFile>();
-    var timestamp = Instant.now();
+    try {
+      var fileHashes = new ArrayList<HashedFile>();
+      var timestamp = Instant.now();
 
-    Files.walkFileTree(root, new SimpleFileVisitor<>() {
-      @Override
-      public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-        if (Files.getLastModifiedTime(file).toInstant().isBefore(timestamp) &&
-            !file.getFileName().toString().startsWith(".")) {
+      Files.walkFileTree(root, new SimpleFileVisitor<>() {
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+          if (Files.getLastModifiedTime(file).toInstant().isBefore(timestamp) &&
+              !file.getFileName().toString().startsWith(".")) {
 
-          var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file));
-          fileHashes.add(hashedFile);
+            var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file));
+            fileHashes.add(hashedFile);
+          }
+          return FileVisitResult.CONTINUE;
         }
-        return FileVisitResult.CONTINUE;
-      }
-    });
+      });
 
-    return fileHashes;
+      return fileHashes;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  @SneakyThrows
   private String calculateSHA3(Path file) {
-    var sha3 = MessageDigest.getInstance("SHA3-256");
+    try {
+      var sha3 = MessageDigest.getInstance("SHA3-256");
 
-    try (var reader = new FileInputStream(file.toFile())) {
-      byte[] buffer = new byte[BUFFER_SIZE];
+      try (var reader = new FileInputStream(file.toFile())) {
+        byte[] buffer = new byte[BUFFER_SIZE];
 
-      for (int read = reader.read(buffer, 0, BUFFER_SIZE); read > -1;
-          read = reader.read(buffer, 0, BUFFER_SIZE)) {
-        sha3.update(buffer, 0, read);
+        for (int read = reader.read(buffer, 0, BUFFER_SIZE); read > -1;
+            read = reader.read(buffer, 0, BUFFER_SIZE)) {
+          sha3.update(buffer, 0, read);
+        }
+
+        return HexFormat.of().formatHex(sha3.digest());
       }
-
-      return HexFormat.of().formatHex(sha3.digest());
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 }
