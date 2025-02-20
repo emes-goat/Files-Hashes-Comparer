@@ -6,11 +6,16 @@ import java.nio.file.Paths;
 public class Main {
 
   public static void main(String[] args) {
-    var directory = Paths.get(args[0]);
-    require(Files.exists(directory), "Directory doesn't exist");
-    require(Files.isDirectory(directory), "Directory isn't a directory");
+    require(args.length == 1, "Invalid arguments");
+    var location = Paths.get(args[0]);
 
-    new HashesCalculator().run(directory);
+    if (Files.isDirectory(location)) {
+      new FileTreeHash().calculateAndCompare(location);
+    } else if (Files.isRegularFile(location)) {
+      new FileTreeHash().calculateForFile(location);
+    } else {
+      throw new RuntimeException("Location doesn't exist");
+    }
   }
 
   public static void require(boolean condition, String message) {

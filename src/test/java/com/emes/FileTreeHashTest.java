@@ -12,7 +12,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
-class HashesCalculatorTest {
+class FileTreeHashTest {
 
   private static final Path directory = Paths.get("./hellokitty");
   private static final Path fileAName = Paths.get("afile");
@@ -21,11 +21,11 @@ class HashesCalculatorTest {
   @Test
   public void happyPath() throws IOException, InterruptedException {
     cleanup();
-    var hashesCalculator = new HashesCalculator();
+    var hashesCalculator = new FileTreeHash();
     Files.createDirectory(directory);
 
     Files.writeString(directory.resolve(fileAName), "Something");
-    var result = hashesCalculator.run(directory);
+    var result = hashesCalculator.calculateAndCompare(directory);
     assertEquals(0, result.size());
 
     Thread.sleep(100);
@@ -34,22 +34,24 @@ class HashesCalculatorTest {
     var fileBContent = "Soft kitty warm kitty";
     Files.writeString(directory.resolve(fileAName), fileAContent);
     Files.writeString(directory.resolve(fileBName), fileBContent);
-    result = hashesCalculator.run(directory);
+    result = hashesCalculator.calculateAndCompare(directory);
     assertEquals(1, result.size());
-    assertEquals(fileAName, result.getFirst());
+    assertEquals(fileAName, result.getFirst().path());
+    assertEquals(result.getFirst().current(),
+        hashesCalculator.calculateForFile(directory.resolve(fileAName)));
 
     Thread.sleep(100);
 
     //Doft instead of Soft
     var fileBContentChanged = "Doft kitty warm kitty";
     Files.writeString(directory.resolve(fileBName), fileBContentChanged);
-    result = hashesCalculator.run(directory);
+    result = hashesCalculator.calculateAndCompare(directory);
     assertEquals(1, result.size());
-    assertEquals(fileBName, result.getFirst());
+    assertEquals(fileBName, result.getFirst().path());
 
     Thread.sleep(100);
 
-    result = hashesCalculator.run(directory);
+    result = hashesCalculator.calculateAndCompare(directory);
     assertEquals(0, result.size());
   }
 

@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
@@ -17,20 +16,20 @@ import java.util.Objects;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-public class HashesCalculator {
+public class FileTreeHash {
 
   private static final int BUFFER_SIZE = 16384;
   private static final String DATABASE_FILE_NAME = ".hashes";
   private final Logger log = LogManager.getLogger();
 
-  public List<Path> run(Path directory) {
+  public List<ChangedHash> calculateAndCompare(Path directory) {
     log.info("Calculate hashes in {}", directory);
     var currentHashes = calculateHashes(directory);
     log.info("Calculated hashes for {} files", currentHashes.size());
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
     var previousHashes = new Database(databasePath).readPreviousHashes();
-    List<Path> changedHashes = List.of();
+    List<ChangedHash> changedHashes = List.of();
     if (previousHashes.isEmpty()) {
       log.warn("Previous hashes is empty. Not comparing.");
     } else {
@@ -39,7 +38,7 @@ public class HashesCalculator {
         log.info("OK - no changed hashes");
       } else {
         log.error("WARNING - HASH CHANGED!!!");
-        changedHashes.forEach(it -> log.error("HASH CHANGED FOR: {}", it.toString()));
+        changedHashes.forEach(it -> log.error("HASH CHANGED FOR: {}", it));
       }
     }
 
@@ -47,20 +46,31 @@ public class HashesCalculator {
     return changedHashes;
   }
 
-  private List<Path> compareHashes(List<HashedFile> previousFiles, List<HashedFile> currentFiles) {
-    return currentFiles
+  public String calculateForFile(Path file) {
+    log.info("Calculate hash for single file: {}", file);
+    var hash = calculateSHA3(file);
+    log.info("Hash: {}", hash);
+    return hash;
+  }
+
+  private List<ChangedHash> compareHashes(List<HashedFile> previousHashes,
+      List<HashedFile> currentHashes) {
+
+    return currentHashes
         .stream()
         .map(currentFile ->
-            previousFiles
+            previousHashes
                 .stream()
                 .filter(previousFile ->
                     currentFile.path().equals(previousFile.path()) &&
                         !currentFile.hash().equals(previousFile.hash()))
+                .map(previousHash ->
+                    new ChangedHash(Path.of(currentFile.path()), previousHash.hash(),
+                        currentFile.hash()))
                 .findFirst()
                 .orElse(null)
         )
         .filter(Objects::nonNull)
-        .map(it -> Paths.get(it.path()))
         .toList();
   }
 
