@@ -28,7 +28,7 @@ class FileTreeHashTest {
     var result = hashesCalculator.calculateAndCompare(directory);
     assertEquals(0, result.size());
 
-    Thread.sleep(100);
+    Thread.sleep(50);
 
     var fileAContent = "Welcome to the jungle";
     var fileBContent = "Soft kitty warm kitty";
@@ -40,7 +40,7 @@ class FileTreeHashTest {
     assertEquals(result.getFirst().current(),
         hashesCalculator.calculateForFile(directory.resolve(fileAName)));
 
-    Thread.sleep(100);
+    Thread.sleep(50);
 
     //Doft instead of Soft
     var fileBContentChanged = "Doft kitty warm kitty";
@@ -49,7 +49,7 @@ class FileTreeHashTest {
     assertEquals(1, result.size());
     assertEquals(fileBName, result.getFirst().path());
 
-    Thread.sleep(100);
+    Thread.sleep(50);
 
     result = hashesCalculator.calculateAndCompare(directory);
     assertEquals(0, result.size());

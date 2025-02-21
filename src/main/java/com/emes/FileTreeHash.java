@@ -19,7 +19,7 @@ import org.apache.logging.log4j.Logger;
 public class FileTreeHash {
 
   private static final int BUFFER_SIZE = 16384;
-  private static final String DATABASE_FILE_NAME = ".hashes";
+  private static final String DATABASE_FILE_NAME = ".hashes.csv";
   private final Logger log = LogManager.getLogger();
 
   public List<ChangedHash> calculateAndCompare(Path directory) {
@@ -28,11 +28,12 @@ public class FileTreeHash {
     log.info("Calculated hashes for {} files", currentHashes.size());
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
-    var previousHashes = new Database(databasePath).readPreviousHashes();
+
     List<ChangedHash> changedHashes = List.of();
-    if (previousHashes.isEmpty()) {
-      log.warn("Previous hashes is empty. Not comparing.");
+    if (!Files.exists(databasePath)) {
+      log.warn("File with hashes doesn't exist");
     } else {
+      var previousHashes = readFromFile(databasePath);
       changedHashes = compareHashes(previousHashes, currentHashes);
       if (changedHashes.isEmpty()) {
         log.info("OK - no changed hashes");
@@ -42,7 +43,7 @@ public class FileTreeHash {
       }
     }
 
-    new Database(databasePath).saveAll(currentHashes);
+    saveToFile(currentHashes, databasePath);
     return changedHashes;
   }
 
@@ -112,6 +113,27 @@ public class FileTreeHash {
 
         return HexFormat.of().formatHex(sha3.digest());
       }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void saveToFile(List<HashedFile> hashes, Path databaseFile) {
+    try {
+      var strings = hashes.stream().map(Record::toString).toList();
+      Files.write(databaseFile, strings);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private List<HashedFile> readFromFile(Path databaseFile) {
+    try {
+      return Files.readAllLines(databaseFile)
+          .stream()
+          .map(it -> it.split(","))
+          .map(it -> new HashedFile(it[0], it[1]))
+          .toList();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

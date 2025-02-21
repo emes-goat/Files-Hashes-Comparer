@@ -5,4 +5,8 @@ public record HashedFile(
     String hash
 ) {
 
+  @Override
+  public String toString() {
+    return path + "," + hash;
+  }
 }
