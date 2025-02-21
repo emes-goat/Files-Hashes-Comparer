@@ -25,13 +25,13 @@ public class FileTreeHash {
   public List<ChangedHash> calculateAndCompare(Path directory) {
     log.info("Calculate hashes in {}", directory);
     var currentHashes = calculateHashes(directory);
-    log.info("Calculated hashes for {} files", currentHashes.size());
+    log.info("Calculated {} hashes", currentHashes.size());
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
 
     List<ChangedHash> changedHashes = List.of();
     if (!Files.exists(databasePath)) {
-      log.warn("File with hashes doesn't exist");
+      log.info("File with previous hashes doesn't exist");
     } else {
       var previousHashes = readFromFile(databasePath);
       changedHashes = compareHashes(previousHashes, currentHashes);
