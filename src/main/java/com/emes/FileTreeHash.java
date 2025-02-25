@@ -20,26 +20,26 @@ public class FileTreeHash {
 
   private static final int BUFFER_SIZE = 16384;
   private static final String DATABASE_FILE_NAME = ".hashes.csv";
-  private final Logger log = LogManager.getLogger();
+  private static final Logger LOGGER = LogManager.getLogger();
 
   public List<ChangedHash> calculateAndCompare(Path directory) {
-    log.info("Calculate hashes in {}", directory);
+    LOGGER.info("Calculate hashes in {}", directory);
     var currentHashes = calculateHashes(directory);
-    log.info("Calculated {} hashes", currentHashes.size());
+    LOGGER.info("Calculated {} hashes", currentHashes.size());
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
 
     List<ChangedHash> changedHashes = List.of();
     if (!Files.exists(databasePath)) {
-      log.info("File with previous hashes doesn't exist");
+      LOGGER.info("File with previous hashes doesn't exist");
     } else {
       var previousHashes = readFromFile(databasePath);
       changedHashes = compareHashes(previousHashes, currentHashes);
       if (changedHashes.isEmpty()) {
-        log.info("OK - no changed hashes");
+        LOGGER.info("OK - no changed hashes");
       } else {
-        log.error("HASH CHANGED!!!");
-        changedHashes.forEach(it -> log.error(it.toString()));
+        LOGGER.error("HASH CHANGED!!!");
+        changedHashes.forEach(it -> LOGGER.error(it.toString()));
       }
     }
 
@@ -48,9 +48,9 @@ public class FileTreeHash {
   }
 
   public String calculateForFile(Path file) {
-    log.info("Calculate hash for single file: {}", file);
+    LOGGER.info("Calculate hash for single file: {}", file);
     var hash = calculateSHA3(file);
-    log.info("Hash: {}", hash);
+    LOGGER.info("Hash: {}", hash);
     return hash;
   }
 
