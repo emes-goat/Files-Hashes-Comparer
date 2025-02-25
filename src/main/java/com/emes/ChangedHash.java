@@ -8,4 +8,8 @@ public record ChangedHash(
     String current
 ) {
 
+  @Override
+  public String toString() {
+    return path + " " + previous + " -> " + current;
+  }
 }

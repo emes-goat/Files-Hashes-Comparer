@@ -38,8 +38,8 @@ public class FileTreeHash {
       if (changedHashes.isEmpty()) {
         log.info("OK - no changed hashes");
       } else {
-        log.error("WARNING - HASH CHANGED!!!");
-        changedHashes.forEach(it -> log.error("HASH CHANGED FOR: {}", it));
+        log.error("HASH CHANGED!!!");
+        changedHashes.forEach(it -> log.error(it.toString()));
       }
     }
 
