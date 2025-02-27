@@ -23,9 +23,8 @@ public class FileTreeHash {
   private static final Logger LOGGER = LogManager.getLogger();
 
   public List<ChangedHash> calculateAndCompare(Path directory) {
-    LOGGER.info("Calculate hashes in {}", directory);
+    LOGGER.info("Compare hashes in {}", directory);
     var currentHashes = calculateHashes(directory);
-    LOGGER.info("Calculated {} hashes", currentHashes.size());
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
 
@@ -84,7 +83,9 @@ public class FileTreeHash {
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
           if (Files.getLastModifiedTime(file).toInstant().isBefore(timestamp) &&
-              !file.getFileName().toString().startsWith(".")) {
+              !file.getFileName().toString().startsWith(".") &&
+              !file.getFileName().toString().endsWith(".ods")
+          ) {
 
             var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file));
             fileHashes.add(hashedFile);
