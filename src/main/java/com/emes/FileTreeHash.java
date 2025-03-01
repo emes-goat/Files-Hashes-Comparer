@@ -1,26 +1,25 @@
 package com.emes;
 
 import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class FileTreeHash {
 
-  private static final int BUFFER_SIZE = 16384;
+  private static final int BUFFER_SIZE = 64 * 1024;
   private static final String DATABASE_FILE_NAME = ".hashes.csv";
   private static final Logger LOGGER = LogManager.getLogger();
+  private static final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors();
 
   public List<ChangedHash> calculateAndCompare(Path directory) {
     LOGGER.info("Compare hashes in {}", directory);
@@ -76,25 +75,42 @@ public class FileTreeHash {
 
   private List<HashedFile> calculateHashes(Path root) {
     try {
-      var fileHashes = new ArrayList<HashedFile>();
       var timestamp = Instant.now();
 
-      Files.walkFileTree(root, new SimpleFileVisitor<>() {
-        @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-          if (Files.getLastModifiedTime(file).toInstant().isBefore(timestamp) &&
-              !file.getFileName().toString().startsWith(".") &&
-              !file.getFileName().toString().endsWith(".ods")
-          ) {
+      List<Path> eligibleFiles = Files.walk(root)
+          .filter(Files::isRegularFile)
+          .filter(file -> {
+            try {
+              var attrs = Files.readAttributes(file, BasicFileAttributes.class);
+              var fileName = file.getFileName().toString();
+              return attrs.lastModifiedTime().toInstant().isBefore(timestamp) &&
+                  !fileName.startsWith(".") && !fileName.endsWith(".ods");
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
+          })
+          .toList();
 
-            var hashedFile = new HashedFile(root.relativize(file).toString(), calculateSHA3(file));
-            fileHashes.add(hashedFile);
-          }
-          return FileVisitResult.CONTINUE;
-        }
-      });
+      List<Future<HashedFile>> futures;
+      try (var executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE)) {
+        futures = eligibleFiles.stream()
+            .map(file -> executor.submit(() -> {
+              var relativePath = root.relativize(file).toString();
+              var hash = calculateSHA3(file);
+              return new HashedFile(relativePath, hash);
+            }))
+            .toList();
 
-      return fileHashes;
+        return futures.stream()
+            .map(it -> {
+              try {
+                return it.get();
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            })
+            .toList();
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
