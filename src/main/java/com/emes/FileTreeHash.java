@@ -10,7 +10,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import lombok.SneakyThrows;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -26,22 +26,21 @@ public class FileTreeHash {
     var currentHashes = calculateHashes(directory);
 
     var databasePath = directory.resolve(DATABASE_FILE_NAME);
-
     List<ChangedHash> changedHashes = List.of();
     if (!Files.exists(databasePath)) {
       LOGGER.info("File with previous hashes doesn't exist");
     } else {
       var previousHashes = readFromFile(databasePath);
       changedHashes = compareHashes(previousHashes, currentHashes);
-      if (changedHashes.isEmpty()) {
-        LOGGER.info("OK - no changed hashes");
-      } else {
-        LOGGER.error("HASH CHANGED!!!");
-        changedHashes.forEach(it -> LOGGER.error(it.toString()));
-      }
     }
 
-    saveToFile(currentHashes, databasePath);
+    if (changedHashes.isEmpty()) {
+      LOGGER.info("OK - no changed hashes");
+    } else {
+      LOGGER.error("HASH CHANGED!!!");
+      changedHashes.forEach(it -> LOGGER.error(it.toString()));
+    }
+    writeToFile(currentHashes, databasePath);
     return changedHashes;
   }
 
@@ -73,86 +72,74 @@ public class FileTreeHash {
         .toList();
   }
 
+  @SneakyThrows
   private List<HashedFile> calculateHashes(Path root) {
-    try {
-      var timestamp = Instant.now();
+    var timestamp = Instant.now();
 
-      List<Path> eligibleFiles = Files.walk(root)
-          .filter(Files::isRegularFile)
-          .filter(file -> {
+    List<Path> eligibleFiles = Files.walk(root)
+        .filter(Files::isRegularFile)
+        .filter(file -> {
+          try {
+            var attrs = Files.readAttributes(file, BasicFileAttributes.class);
+            var fileName = file.getFileName().toString();
+            return attrs.lastModifiedTime().toInstant().isBefore(timestamp) &&
+                !fileName.startsWith(".") && !fileName.endsWith(".ods");
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        })
+        .toList();
+
+    try (var executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE)) {
+      var futures = eligibleFiles.stream()
+          .map(file -> executor.submit(() -> {
+            var relativePath = root.relativize(file).toString();
+            var hash = calculateSHA3(file);
+            return new HashedFile(relativePath, hash);
+          }))
+          .toList();
+
+      return futures.stream()
+          .map(it -> {
             try {
-              var attrs = Files.readAttributes(file, BasicFileAttributes.class);
-              var fileName = file.getFileName().toString();
-              return attrs.lastModifiedTime().toInstant().isBefore(timestamp) &&
-                  !fileName.startsWith(".") && !fileName.endsWith(".ods");
+              return it.get();
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
           })
           .toList();
-
-      List<Future<HashedFile>> futures;
-      try (var executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE)) {
-        futures = eligibleFiles.stream()
-            .map(file -> executor.submit(() -> {
-              var relativePath = root.relativize(file).toString();
-              var hash = calculateSHA3(file);
-              return new HashedFile(relativePath, hash);
-            }))
-            .toList();
-
-        return futures.stream()
-            .map(it -> {
-              try {
-                return it.get();
-              } catch (Exception e) {
-                throw new RuntimeException(e);
-              }
-            })
-            .toList();
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
     }
   }
 
+  @SneakyThrows
   private String calculateSHA3(Path file) {
-    try {
-      var sha3 = MessageDigest.getInstance("SHA3-256");
+    var sha3 = MessageDigest.getInstance("SHA3-256");
 
-      try (var reader = new FileInputStream(file.toFile())) {
-        byte[] buffer = new byte[BUFFER_SIZE];
+    try (var reader = new FileInputStream(file.toFile())) {
+      byte[] buffer = new byte[BUFFER_SIZE];
 
-        for (int read = reader.read(buffer, 0, BUFFER_SIZE); read > -1;
-            read = reader.read(buffer, 0, BUFFER_SIZE)) {
-          sha3.update(buffer, 0, read);
-        }
-
-        return HexFormat.of().formatHex(sha3.digest());
+      for (int read = reader.read(buffer, 0, BUFFER_SIZE); read > -1;
+          read = reader.read(buffer, 0, BUFFER_SIZE)) {
+        sha3.update(buffer, 0, read);
       }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+
+      return HexFormat.of().formatHex(sha3.digest());
     }
   }
 
-  private void saveToFile(List<HashedFile> hashes, Path databaseFile) {
-    try {
-      var strings = hashes.stream().map(Record::toString).toList();
-      Files.write(databaseFile, strings);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  @SneakyThrows
+  private void writeToFile(List<HashedFile> hashes, Path databaseFile) {
+    var strings = hashes.stream()
+        .map(Record::toString)
+        .toList();
+    Files.write(databaseFile, strings);
   }
 
+  @SneakyThrows
   private List<HashedFile> readFromFile(Path databaseFile) {
-    try {
-      return Files.readAllLines(databaseFile)
-          .stream()
-          .map(it -> it.split(","))
-          .map(it -> new HashedFile(it[0], it[1]))
-          .toList();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    return Files.readAllLines(databaseFile)
+        .stream()
+        .map(HashedFile::fromString)
+        .toList();
   }
 }
