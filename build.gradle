@@ -34,3 +34,9 @@ jar {
 kotlin {
     jvmToolchain(23)
 }
+
+tasks.shadowJar {
+    archiveBaseName = "hash-comparer"
+    archiveClassifier = ""
+    archiveVersion = ""
+}
