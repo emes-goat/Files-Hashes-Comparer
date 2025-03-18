@@ -1,15 +1,13 @@
-package com.emes;
+package com.emes
 
-import java.nio.file.Path;
+import java.nio.file.Path
 
-public record ChangedHash(
-    Path path,
-    String previous,
-    String current
+data class ChangedHash(
+    val path: Path,
+    val previous: String,
+    val current: String
 ) {
-
-  @Override
-  public String toString() {
-    return path + " " + previous + " -> " + current;
-  }
+    override fun toString(): String {
+        return "$path $previous -> $current"
+    }
 }

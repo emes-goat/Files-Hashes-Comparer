@@ -1,26 +1,25 @@
-package com.emes;
+package com.emes
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Files
+import java.nio.file.Paths
 
-public class Main {
+object Main {
 
-  public static void main(String[] args) {
-    require(args.length == 1, "Invalid arguments");
-    var location = Paths.get(args[0]);
+    @JvmStatic
+    fun main(args: Array<String>) {
+        require(args.size == 1, "Invalid arguments")
+        val location = Paths.get(args[0])
 
-    if (Files.isDirectory(location)) {
-      new FileTreeHash().calculateAndCompare(location);
-    } else if (Files.isRegularFile(location)) {
-      new FileTreeHash().calculateForFile(location);
-    } else {
-      throw new RuntimeException("Location doesn't exist");
+        if (Files.isDirectory(location)) {
+            FileTreeHash().calculateAndCompare(location)
+        } else if (Files.isRegularFile(location)) {
+            FileTreeHash().calculateForFile(location)
+        } else {
+            throw RuntimeException("Location doesn't exist")
+        }
     }
-  }
 
-  public static void require(boolean condition, String message) {
-    if (!condition) {
-      throw new IllegalArgumentException(message);
+    fun require(condition: Boolean, message: String?) {
+        require(condition) { message!! }
     }
-  }
 }

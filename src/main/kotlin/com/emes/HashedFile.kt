@@ -1,19 +1,19 @@
-package com.emes;
+package com.emes
 
-public record HashedFile(
-    String path,
-    String hash
+data class HashedFile(
+    val path: String,
+    val hash: String
 ) {
+    override fun toString(): String {
+        return path + SEPARATOR + hash
+    }
 
-  private static final String SEPARATOR = ",";
+    companion object {
+        private const val SEPARATOR = ","
 
-  @Override
-  public String toString() {
-    return path + SEPARATOR + hash;
-  }
-
-  public static HashedFile fromString(String string) {
-    var split = string.split(SEPARATOR);
-    return new HashedFile(split[0], split[1]);
-  }
+        fun fromString(string: String): HashedFile {
+            val split = string.split(SEPARATOR)
+            return HashedFile(split[0], split[1])
+        }
+    }
 }

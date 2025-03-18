@@ -1,145 +1,127 @@
-package com.emes;
+package com.emes
 
-import java.io.FileInputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.security.MessageDigest;
-import java.time.Instant;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.Executors;
-import lombok.SneakyThrows;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import io.github.oshai.kotlinlogging.KotlinLogging
+import java.io.FileInputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
+import java.security.MessageDigest
+import java.time.Instant
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
-public class FileTreeHash {
+class FileTreeHash {
 
-  private static final int BUFFER_SIZE = 64 * 1024;
-  private static final String DATABASE_FILE_NAME = ".hashes.csv";
-  private static final Logger LOGGER = LogManager.getLogger();
-  private static final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors();
+    private val log = KotlinLogging.logger {}
 
-  public List<ChangedHash> calculateAndCompare(Path directory) {
-    LOGGER.info("Compare hashes in {}", directory);
-    var currentHashes = calculateHashes(directory);
-
-    var databasePath = directory.resolve(DATABASE_FILE_NAME);
-    List<ChangedHash> changedHashes = List.of();
-    if (!Files.exists(databasePath)) {
-      LOGGER.info("File with previous hashes doesn't exist");
-    } else {
-      var previousHashes = readFromFile(databasePath);
-      changedHashes = compareHashes(previousHashes, currentHashes);
+    companion object {
+        private const val BUFFER_SIZE = 64 * 1024
+        private const val DATABASE_FILE_NAME = ".hashes.csv"
+        private val THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors()
     }
 
-    if (changedHashes.isEmpty()) {
-      LOGGER.info("OK - no changed hashes");
-    } else {
-      LOGGER.error("HASH CHANGED!!!");
-      changedHashes.forEach(it -> LOGGER.error(it.toString()));
+    fun calculateAndCompare(directory: Path): List<ChangedHash> {
+        log.info { "Compare hashes in $directory" }
+        val currentHashes = calculateHashes(directory)
+
+        val databasePath = directory.resolve(DATABASE_FILE_NAME)
+        val changedHashes = if (Files.exists(databasePath)) {
+            val previousHashes = readFromFile(databasePath)
+            compareHashes(previousHashes, currentHashes)
+        } else {
+            log.info { "File with previous hashes doesn't exist" }
+            listOf()
+        }
+
+        if (changedHashes.isEmpty()) {
+            log.info { "OK - no changed hashes" }
+        } else {
+            log.error { "HASH CHANGED!!!" }
+            changedHashes.forEach { log.error { it.toString() } }
+        }
+        writeToFile(currentHashes, databasePath)
+        return changedHashes
     }
-    writeToFile(currentHashes, databasePath);
-    return changedHashes;
-  }
 
-  public String calculateForFile(Path file) {
-    LOGGER.info("Calculate hash for single file: {}", file);
-    var hash = calculateSHA3(file);
-    LOGGER.info("Hash: {}", hash);
-    return hash;
-  }
+    fun calculateForFile(file: Path): String {
+        log.info { "${"Calculate hash for single file: {}"} $file" }
+        val hash = calculateSHA3(file)
+        log.info { "${"Hash: {}"} $hash" }
+        return hash
+    }
 
-  private List<ChangedHash> compareHashes(List<HashedFile> previousHashes,
-      List<HashedFile> currentHashes) {
-
-    return currentHashes
-        .stream()
-        .map(currentFile ->
-            previousHashes
-                .stream()
-                .filter(previousFile ->
-                    currentFile.path().equals(previousFile.path()) &&
-                        !currentFile.hash().equals(previousFile.hash()))
-                .map(previousHash ->
-                    new ChangedHash(Path.of(currentFile.path()), previousHash.hash(),
-                        currentFile.hash()))
-                .findFirst()
-                .orElse(null)
-        )
-        .filter(Objects::nonNull)
-        .toList();
-  }
-
-  @SneakyThrows
-  private List<HashedFile> calculateHashes(Path root) {
-    var timestamp = Instant.now();
-
-    List<Path> eligibleFiles = Files.walk(root)
-        .filter(Files::isRegularFile)
-        .filter(file -> {
-          try {
-            var attrs = Files.readAttributes(file, BasicFileAttributes.class);
-            var fileName = file.getFileName().toString();
-            return attrs.lastModifiedTime().toInstant().isBefore(timestamp) &&
-                !fileName.startsWith(".") && !fileName.endsWith(".ods");
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-        })
-        .toList();
-
-    try (var executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE)) {
-      var futures = eligibleFiles.stream()
-          .map(file -> executor.submit(() -> {
-            var relativePath = root.relativize(file).toString();
-            var hash = calculateSHA3(file);
-            return new HashedFile(relativePath, hash);
-          }))
-          .toList();
-
-      return futures.stream()
-          .map(it -> {
-            try {
-              return it.get();
-            } catch (Exception e) {
-              throw new RuntimeException(e);
+    private fun compareHashes(
+        previousHashes: List<HashedFile>,
+        currentHashes: List<HashedFile>
+    ): List<ChangedHash> {
+        return currentHashes
+            .mapNotNull { currentFile: HashedFile ->
+                previousHashes
+                    .filter { previousFile: HashedFile ->
+                        currentFile.path == previousFile.path
+                                && currentFile.hash != previousFile.hash
+                    }
+                    .map { previousHash: HashedFile ->
+                        ChangedHash(
+                            Path.of(currentFile.path), previousHash.hash,
+                            currentFile.hash
+                        )
+                    }
+                    .firstOrNull()
             }
-          })
-          .toList();
     }
-  }
 
-  @SneakyThrows
-  private String calculateSHA3(Path file) {
-    var sha3 = MessageDigest.getInstance("SHA3-256");
+    private fun calculateHashes(root: Path): List<HashedFile> {
+        val timestamp = Instant.now()
 
-    try (var reader = new FileInputStream(file.toFile())) {
-      byte[] buffer = new byte[BUFFER_SIZE];
+        val eligibleFiles = Files.walk(root)
+            .filter { path: Path -> Files.isRegularFile(path) }
+            .filter { file: Path ->
+                val attrs = Files.readAttributes<BasicFileAttributes>(
+                    file,
+                    BasicFileAttributes::class.java
+                )
+                val fileName = file.fileName.toString()
+                attrs.lastModifiedTime().toInstant()
+                    .isBefore(timestamp) && !fileName.startsWith(".") && !fileName.endsWith(".ods")
+            }
+            .toList()
 
-      for (int read = reader.read(buffer, 0, BUFFER_SIZE); read > -1;
-          read = reader.read(buffer, 0, BUFFER_SIZE)) {
-        sha3.update(buffer, 0, read);
-      }
+        Executors.newFixedThreadPool(THREAD_POOL_SIZE).use { executor ->
+            val futures = eligibleFiles.map {
+                executor.submit<HashedFile>(Callable {
+                    val relativePath = root.relativize(it).toString()
+                    val hash = calculateSHA3(it)
+                    HashedFile(relativePath, hash)
+                })
+            }
 
-      return HexFormat.of().formatHex(sha3.digest());
+            return futures.map { it.get() }
+        }
     }
-  }
 
-  @SneakyThrows
-  private void writeToFile(List<HashedFile> hashes, Path databaseFile) {
-    var strings = hashes.stream()
-        .map(Record::toString)
-        .toList();
-    Files.write(databaseFile, strings);
-  }
+    @OptIn(ExperimentalStdlibApi::class)
+    private fun calculateSHA3(file: Path): String {
+        val sha3 = MessageDigest.getInstance("SHA3-256")
 
-  @SneakyThrows
-  private List<HashedFile> readFromFile(Path databaseFile) {
-    return Files.readAllLines(databaseFile)
-        .stream()
-        .map(HashedFile::fromString)
-        .toList();
-  }
+        FileInputStream(file.toFile()).use { reader ->
+            val buffer = ByteArray(BUFFER_SIZE)
+            var read: Int = reader.read(buffer, 0, BUFFER_SIZE)
+            while (read > -1) {
+                sha3.update(buffer, 0, read)
+                read = reader.read(buffer, 0, BUFFER_SIZE)
+            }
+            return sha3.digest().toHexString()
+        }
+    }
+
+    private fun writeToFile(hashes: List<HashedFile>, databaseFile: Path) {
+        val strings = hashes.map { it.toString() }
+        Files.write(databaseFile, strings)
+    }
+
+    private fun readFromFile(databaseFile: Path): List<HashedFile> {
+        return Files.readAllLines(databaseFile)
+            .map { HashedFile.fromString(it) }
+    }
 }
