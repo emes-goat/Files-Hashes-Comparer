@@ -1,12 +1,11 @@
 package com.emes
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.*
 import java.io.FileInputStream
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Instant
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
 import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.io.path.getLastModifiedTime
@@ -80,7 +79,7 @@ class FileTreeHash {
             }
     }
 
-    private fun calculateHashes(root: Path): List<FileHash> {
+    private fun calculateHashes(root: Path): List<FileHash> = runBlocking {
         val timestamp = Instant.now()
 
         val eligibleFiles = root.walk()
@@ -90,17 +89,13 @@ class FileTreeHash {
             }
             .toList()
 
-        Executors.newFixedThreadPool(threadPoolSize).use { executor ->
-            val futures = eligibleFiles.map {
-                executor.submit<FileHash>(Callable {
-                    val relativePath = root.relativize(it)
-                    val hash = calculateSHA3(it)
-                    FileHash(relativePath, hash)
-                })
+        eligibleFiles
+            .map { file ->
+                CoroutineScope(Dispatchers.IO.limitedParallelism(threadPoolSize)).async {
+                    FileHash(root.relativize(file), calculateSHA3(file))
+                }
             }
-
-            return futures.map { it.get() }
-        }
+            .awaitAll()
     }
 
     @OptIn(ExperimentalStdlibApi::class)
