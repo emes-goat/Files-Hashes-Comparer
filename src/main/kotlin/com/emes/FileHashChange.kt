@@ -2,7 +2,7 @@ package com.emes
 
 import java.nio.file.Path
 
-data class ChangedHash(
+data class FileHashChange(
     val path: Path,
     val previous: String,
     val current: String

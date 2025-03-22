@@ -1,25 +1,18 @@
 package com.emes
 
-import java.nio.file.Files
-import java.nio.file.Paths
+import kotlin.io.path.Path
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
 
-object Main {
+fun main(args: Array<String>) {
+    require(args.size == 1) { "Directory or file must be provided in argument" }
+    val location = Path(args[0])
 
-    @JvmStatic
-    fun main(args: Array<String>) {
-        require(args.size == 1, "Invalid arguments")
-        val location = Paths.get(args[0])
-
-        if (Files.isDirectory(location)) {
-            FileTreeHash().calculateAndCompare(location)
-        } else if (Files.isRegularFile(location)) {
-            FileTreeHash().calculateForFile(location)
-        } else {
-            throw RuntimeException("Location doesn't exist")
-        }
-    }
-
-    fun require(condition: Boolean, message: String?) {
-        require(condition) { message!! }
+    if (location.isDirectory()) {
+        FileTreeHash().calculateAndCompare(location)
+    } else if (location.isRegularFile()) {
+        FileTreeHash().calculateForFile(location)
+    } else {
+        throw RuntimeException("Location doesn't exist")
     }
 }

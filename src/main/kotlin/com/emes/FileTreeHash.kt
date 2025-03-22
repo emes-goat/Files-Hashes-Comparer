@@ -2,31 +2,40 @@ package com.emes
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.FileInputStream
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import kotlin.io.path.div
+import kotlin.io.path.exists
+import kotlin.io.path.getLastModifiedTime
+import kotlin.io.path.walk
 
 class FileTreeHash {
-
-    private val log = KotlinLogging.logger {}
 
     companion object {
         private const val BUFFER_SIZE = 64 * 1024
         private const val DATABASE_FILE_NAME = ".hashes.csv"
-        private val THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors()
+        private const val HASH_ALGORITHM = "SHA3-256"
     }
 
-    fun calculateAndCompare(directory: Path): List<ChangedHash> {
+    private val log = KotlinLogging.logger {}
+    private val databaseIO = DatabaseIO()
+
+    private val threadPoolSize = Runtime.getRuntime().availableProcessors()
+    private val excludeFilesWith = listOf<(String) -> Boolean>(
+        { it -> it.startsWith(".") },
+        { it -> it.endsWith(".ods") }
+    )
+
+    fun calculateAndCompare(directory: Path): List<FileHashChange> {
         log.info { "Compare hashes in $directory" }
         val currentHashes = calculateHashes(directory)
 
-        val databasePath = directory.resolve(DATABASE_FILE_NAME)
-        val changedHashes = if (Files.exists(databasePath)) {
-            val previousHashes = readFromFile(databasePath)
+        val databasePath = directory / DATABASE_FILE_NAME
+        val changedHashes = if (databasePath.exists()) {
+            val previousHashes = databaseIO.read(databasePath)
             compareHashes(previousHashes, currentHashes)
         } else {
             log.info { "File with previous hashes doesn't exist" }
@@ -39,31 +48,31 @@ class FileTreeHash {
             log.error { "HASH CHANGED!!!" }
             changedHashes.forEach { log.error { it.toString() } }
         }
-        writeToFile(currentHashes, databasePath)
+        databaseIO.write(currentHashes, databasePath)
         return changedHashes
     }
 
     fun calculateForFile(file: Path): String {
-        log.info { "${"Calculate hash for single file: {}"} $file" }
+        log.info { "Calculate hash for single file: $file" }
         val hash = calculateSHA3(file)
-        log.info { "${"Hash: {}"} $hash" }
+        log.info { "Hash: $hash" }
         return hash
     }
 
     private fun compareHashes(
-        previousHashes: List<HashedFile>,
-        currentHashes: List<HashedFile>
-    ): List<ChangedHash> {
+        previousHashes: List<FileHash>,
+        currentHashes: List<FileHash>
+    ): List<FileHashChange> {
         return currentHashes
-            .mapNotNull { currentFile: HashedFile ->
+            .mapNotNull { currentFile: FileHash ->
                 previousHashes
-                    .filter { previousFile: HashedFile ->
+                    .filter { previousFile: FileHash ->
                         currentFile.path == previousFile.path
                                 && currentFile.hash != previousFile.hash
                     }
-                    .map { previousHash: HashedFile ->
-                        ChangedHash(
-                            Path.of(currentFile.path), previousHash.hash,
+                    .map { previousHash: FileHash ->
+                        FileHashChange(
+                            currentFile.path, previousHash.hash,
                             currentFile.hash
                         )
                     }
@@ -71,28 +80,22 @@ class FileTreeHash {
             }
     }
 
-    private fun calculateHashes(root: Path): List<HashedFile> {
+    private fun calculateHashes(root: Path): List<FileHash> {
         val timestamp = Instant.now()
 
-        val eligibleFiles = Files.walk(root)
-            .filter { path: Path -> Files.isRegularFile(path) }
-            .filter { file: Path ->
-                val attrs = Files.readAttributes<BasicFileAttributes>(
-                    file,
-                    BasicFileAttributes::class.java
-                )
-                val fileName = file.fileName.toString()
-                attrs.lastModifiedTime().toInstant()
-                    .isBefore(timestamp) && !fileName.startsWith(".") && !fileName.endsWith(".ods")
+        val eligibleFiles = root.walk()
+            .filter { file ->
+                file.getLastModifiedTime().toInstant().isBefore(timestamp) &&
+                        excludeFilesWith.none { it(file.fileName.toString()) }
             }
             .toList()
 
-        Executors.newFixedThreadPool(THREAD_POOL_SIZE).use { executor ->
+        Executors.newFixedThreadPool(threadPoolSize).use { executor ->
             val futures = eligibleFiles.map {
-                executor.submit<HashedFile>(Callable {
-                    val relativePath = root.relativize(it).toString()
+                executor.submit<FileHash>(Callable {
+                    val relativePath = root.relativize(it)
                     val hash = calculateSHA3(it)
-                    HashedFile(relativePath, hash)
+                    FileHash(relativePath, hash)
                 })
             }
 
@@ -102,7 +105,7 @@ class FileTreeHash {
 
     @OptIn(ExperimentalStdlibApi::class)
     private fun calculateSHA3(file: Path): String {
-        val sha3 = MessageDigest.getInstance("SHA3-256")
+        val sha3 = MessageDigest.getInstance(HASH_ALGORITHM)
 
         FileInputStream(file.toFile()).use { reader ->
             val buffer = ByteArray(BUFFER_SIZE)
@@ -113,15 +116,5 @@ class FileTreeHash {
             }
             return sha3.digest().toHexString()
         }
-    }
-
-    private fun writeToFile(hashes: List<HashedFile>, databaseFile: Path) {
-        val strings = hashes.map { it.toString() }
-        Files.write(databaseFile, strings)
-    }
-
-    private fun readFromFile(databaseFile: Path): List<HashedFile> {
-        return Files.readAllLines(databaseFile)
-            .map { HashedFile.fromString(it) }
     }
 }
