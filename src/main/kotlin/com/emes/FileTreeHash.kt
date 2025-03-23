@@ -1,28 +1,31 @@
 package com.emes
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.*
-import java.io.FileInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
-import java.security.MessageDigest
 import java.time.Instant
 import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.io.path.getLastModifiedTime
 import kotlin.io.path.walk
+import kotlin.time.measureTimedValue
 
 class FileTreeHash {
 
     companion object {
-        private const val BUFFER_SIZE = 64 * 1024
         private const val DATABASE_FILE_NAME = ".hashes.csv"
-        private const val HASH_ALGORITHM = "SHA3-256"
     }
 
     private val log = KotlinLogging.logger {}
     private val databaseIO = DatabaseIO()
+    private val sha3 = SHA3()
 
-    private val threadPoolSize = Runtime.getRuntime().availableProcessors()
+    private val hashDispatcher =
+        Dispatchers.IO.limitedParallelism(Runtime.getRuntime().availableProcessors())
+
     private val excludeFilesWith = listOf<(String) -> Boolean>(
         { it -> it.startsWith(".") },
         { it -> it.endsWith(".ods") }
@@ -30,12 +33,13 @@ class FileTreeHash {
 
     fun calculateAndCompare(directory: Path): List<FileHashChange> {
         log.info { "Compare hashes in $directory" }
-        val currentHashes = calculateHashes(directory)
+        val currentHashes = measureTimedValue { calculateHashes(directory) }
+        log.debug { "Calculating hashes took: ${currentHashes.duration.inWholeMilliseconds}" }
 
         val databasePath = directory / DATABASE_FILE_NAME
         val changedHashes = if (databasePath.exists()) {
             val previousHashes = databaseIO.read(databasePath)
-            compareHashes(previousHashes, currentHashes)
+            compareHashes(previousHashes, currentHashes.value)
         } else {
             log.info { "File with previous hashes doesn't exist" }
             listOf()
@@ -47,13 +51,13 @@ class FileTreeHash {
             log.error { "HASH CHANGED!!!" }
             changedHashes.forEach { log.error { it.toString() } }
         }
-        databaseIO.write(currentHashes, databasePath)
+        databaseIO.write(currentHashes.value, databasePath)
         return changedHashes
     }
 
     fun calculateForFile(file: Path): String {
         log.info { "Calculate hash for single file: $file" }
-        val hash = calculateSHA3(file)
+        val hash = sha3.calculate(file)
         log.info { "Hash: $hash" }
         return hash
     }
@@ -91,25 +95,10 @@ class FileTreeHash {
 
         eligibleFiles
             .map { file ->
-                CoroutineScope(Dispatchers.IO.limitedParallelism(threadPoolSize)).async {
-                    FileHash(root.relativize(file), calculateSHA3(file))
+                async(hashDispatcher) {
+                    FileHash(root.relativize(file), sha3.calculate(file))
                 }
             }
             .awaitAll()
-    }
-
-    @OptIn(ExperimentalStdlibApi::class)
-    private fun calculateSHA3(file: Path): String {
-        val sha3 = MessageDigest.getInstance(HASH_ALGORITHM)
-
-        FileInputStream(file.toFile()).use { reader ->
-            val buffer = ByteArray(BUFFER_SIZE)
-            var read: Int = reader.read(buffer, 0, BUFFER_SIZE)
-            while (read > -1) {
-                sha3.update(buffer, 0, read)
-                read = reader.read(buffer, 0, BUFFER_SIZE)
-            }
-            return sha3.digest().toHexString()
-        }
     }
 }
