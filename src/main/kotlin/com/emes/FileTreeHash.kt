@@ -1,6 +1,5 @@
 package com.emes
 
-import com.emes.databaseio.DatabaseIO
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -16,10 +15,6 @@ import kotlin.time.measureTimedValue
 
 class FileTreeHash {
 
-    companion object {
-        private const val DATABASE_FILE_NAME = ".hashes.csv"
-    }
-
     private val log = KotlinLogging.logger {}
     private val databaseIO = DatabaseIO()
     private val sha3 = SHA3()
@@ -32,12 +27,15 @@ class FileTreeHash {
         { it -> it.endsWith(".ods") }
     )
 
-    fun calculateAndCompare(directory: Path): List<FileHashChange> {
+    fun calculateAndCompare(
+        directory: Path,
+        databaseFileName: String = ".hashes"
+    ): List<FileHashChange> {
         log.info { "Compare hashes in $directory" }
         val currentHashes = measureTimedValue { calculateHashes(directory) }
         log.debug { "Calculating hashes took: ${currentHashes.duration.inWholeMilliseconds}" }
 
-        val databasePath = directory / DATABASE_FILE_NAME
+        val databasePath = directory / databaseFileName
         val changedHashes = if (databasePath.exists()) {
             val previousHashes = databaseIO.read(databasePath)
             compareHashes(previousHashes, currentHashes.value)

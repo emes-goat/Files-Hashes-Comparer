@@ -1,6 +1,5 @@
 package com.emes
 
-import com.emes.databaseio.DatabaseIO
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertIterableEquals
 import org.junit.jupiter.api.Assertions.assertTrue
