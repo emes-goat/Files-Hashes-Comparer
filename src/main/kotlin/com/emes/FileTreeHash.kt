@@ -1,5 +1,6 @@
 package com.emes
 
+import com.emes.databaseio.DatabaseIO
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async

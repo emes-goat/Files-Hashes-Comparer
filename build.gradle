@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'com.gradleup.shadow' version '9.0.0-beta11'
     id 'org.jetbrains.kotlin.jvm' version '2.1.20'
+    id 'com.google.protobuf' version '0.9.4'
 }
 
 group = 'org.example'
@@ -15,9 +16,9 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.24.3")
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.3")
-    implementation("de.siegmar:fastcsv:3.6.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     implementation("com.github.luben:zstd-jni:1.5.7-2:darwin_aarch64")
+    implementation("com.google.protobuf:protobuf-kotlin:4.30.1")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.13.0-M1")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.13.0-M1")
@@ -40,4 +41,17 @@ tasks.shadowJar {
     archiveBaseName = "hash-comparer"
     archiveClassifier = ""
     archiveVersion = ""
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:4.30.1"
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                create("kotlin")
+            }
+        }
+    }
 }

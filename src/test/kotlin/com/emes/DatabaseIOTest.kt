@@ -1,5 +1,6 @@
 package com.emes
 
+import com.emes.databaseio.DatabaseIO
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertIterableEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -32,21 +33,6 @@ class DatabaseIOTest {
         val databaseIO = DatabaseIO()
 
         assertThrows<NoSuchFileException> { databaseIO.read(databaseFile) }
-    }
-
-    @Test
-    fun readUncompressedFile() {
-        val databaseIO = DatabaseIO()
-
-        databaseFile.writeText(
-            """
-        "random file name/in a subdirectory, with comma.jpeg",xyz
-        "random_fileName\IN 1234 DIRECTORY.txt",abc
-        """.trimIndent()
-        )
-
-        val actual = databaseIO.read(databaseFile)
-        assertIterableEquals(expected, actual)
     }
 
     @Test
