@@ -6,14 +6,11 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
-import java.time.Instant
 import kotlin.io.path.div
 import kotlin.io.path.exists
-import kotlin.io.path.getLastModifiedTime
 import kotlin.io.path.walk
-import kotlin.time.measureTimedValue
 
-class FileTreeHash {
+class HashDB {
 
     private val log = KotlinLogging.logger {}
     private val databaseIO = DatabaseIO()
@@ -32,13 +29,12 @@ class FileTreeHash {
         databaseFileName: String = ".hashes"
     ): List<FileHashChange> {
         log.info { "Compare hashes in $directory" }
-        val currentHashes = measureTimedValue { calculateHashes(directory) }
-        log.debug { "Calculating hashes took: ${currentHashes.duration.inWholeMilliseconds}" }
+        val currentHashes = calculateHashes(directory)
 
         val databasePath = directory / databaseFileName
         val changedHashes = if (databasePath.exists()) {
             val previousHashes = databaseIO.read(databasePath)
-            compareHashes(previousHashes, currentHashes.value)
+            compareHashes(previousHashes, currentHashes)
         } else {
             log.info { "File with previous hashes doesn't exist" }
             listOf()
@@ -50,7 +46,7 @@ class FileTreeHash {
             log.error { "HASH CHANGED!!!" }
             changedHashes.forEach { log.error { it.toString() } }
         }
-        databaseIO.write(currentHashes.value, databasePath)
+        databaseIO.write(currentHashes, databasePath)
         return changedHashes
     }
 
@@ -65,34 +61,27 @@ class FileTreeHash {
         previousHashes: List<FileHash>,
         currentHashes: List<FileHash>
     ): List<FileHashChange> {
-        return currentHashes
-            .mapNotNull { currentFile: FileHash ->
-                previousHashes
-                    .filter { previousFile: FileHash ->
-                        currentFile.path == previousFile.path
-                                && currentFile.hash != previousFile.hash
-                    }
-                    .map { previousHash: FileHash ->
-                        FileHashChange(
-                            currentFile.path, previousHash.hash,
-                            currentFile.hash
-                        )
-                    }
-                    .firstOrNull()
-            }
+        val previousMap = previousHashes.associateBy { it.path }
+
+        return currentHashes.mapNotNull { current ->
+            previousMap[current.path]
+                ?.takeIf { it.hash != current.hash }
+                ?.let { previous ->
+                    FileHashChange(
+                        path = current.path,
+                        previous = previous.hash,
+                        current = current.hash
+                    )
+                }
+        }
     }
 
     private fun calculateHashes(root: Path): List<FileHash> = runBlocking {
-        val timestamp = Instant.now()
-
-        val eligibleFiles = root.walk()
+        root.walk()
             .filter { file ->
-                file.getLastModifiedTime().toInstant().isBefore(timestamp) &&
-                        excludeFilesWith.none { it(file.fileName.toString()) }
+                excludeFilesWith.none { it(file.fileName.toString()) }
             }
             .toList()
-
-        eligibleFiles
             .map { file ->
                 async(hashDispatcher) {
                     FileHash(root.relativize(file), sha3.calculate(file))

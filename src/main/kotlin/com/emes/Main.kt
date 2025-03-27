@@ -9,9 +9,9 @@ fun main(args: Array<String>) {
     val location = Path(args[0])
 
     if (location.isDirectory()) {
-        FileTreeHash().calculateAndCompare(location)
+        HashDB().calculateAndCompare(location)
     } else if (location.isRegularFile()) {
-        FileTreeHash().calculateForFile(location)
+        HashDB().calculateForFile(location)
     } else {
         throw RuntimeException("Location doesn't exist")
     }

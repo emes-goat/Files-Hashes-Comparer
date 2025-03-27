@@ -10,7 +10,7 @@ import kotlin.io.path.createDirectory
 import kotlin.io.path.writeText
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class FileTreeHashTest {
+class HashDBTest {
 
     private val directory = Path("./hellokitty")
     private val fileAName = Path("afile")
@@ -20,7 +20,7 @@ class FileTreeHashTest {
 
     @Test
     fun happyPath() {
-        val hashesCalculator = FileTreeHash()
+        val hashesCalculator = HashDB()
         directory.createDirectory()
 
         directory.resolve(fileAName).writeText("Something")
