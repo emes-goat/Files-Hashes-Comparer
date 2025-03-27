@@ -30,23 +30,24 @@ class HashDB {
     ): List<FileHashChange> {
         log.info { "Compare hashes in $directory" }
         val currentHashes = calculateHashes(directory)
+        val databaseFile = directory / databaseFileName
 
-        val databasePath = directory / databaseFileName
-        val changedHashes = if (databasePath.exists()) {
-            val previousHashes = databaseIO.read(databasePath)
+        val changedHashes = if (databaseFile.exists()) {
+            val previousHashes = databaseIO.read(databaseFile)
             compareHashes(previousHashes, currentHashes)
         } else {
             log.info { "File with previous hashes doesn't exist" }
-            listOf()
+            emptyList()
         }
 
-        if (changedHashes.isEmpty()) {
-            log.info { "OK - no changed hashes" }
-        } else {
-            log.error { "HASH CHANGED!!!" }
-            changedHashes.forEach { log.error { it.toString() } }
+        when {
+            changedHashes.isEmpty() -> log.info { "OK - No changes detected" }
+            else -> {
+                log.error { "HASH CHANGED!!!" }
+                changedHashes.forEach { log.error { it } }
+            }
         }
-        databaseIO.write(currentHashes, databasePath)
+        databaseIO.write(currentHashes, databaseFile)
         return changedHashes
     }
 
