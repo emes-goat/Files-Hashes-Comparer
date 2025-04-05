@@ -5,7 +5,6 @@ import com.github.luben.zstd.ZstdInputStream
 import com.github.luben.zstd.ZstdOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.io.IOException
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.security.MessageDigest
@@ -13,6 +12,11 @@ import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 
 class DatabaseIO {
+
+    companion object {
+        private const val SHA3_HASH_LENGTH_BITS = 32
+        private const val COMPRESSION_LEVEL = 11
+    }
 
     fun write(fileHashes: List<FileHash>, databaseFile: Path) {
         val compressed = fileHashes.serialize().compress()
@@ -29,12 +33,12 @@ class DatabaseIO {
             return emptyList()
         }
 
-        val hashBytes = rawBytes.copyOfRange(0, 32)
-        val compressedBytes = rawBytes.copyOfRange(32, rawBytes.size)
+        val hashBytes = rawBytes.copyOfRange(0, SHA3_HASH_LENGTH_BITS)
+        val compressedBytes = rawBytes.copyOfRange(SHA3_HASH_LENGTH_BITS, rawBytes.size)
         val compressedBytesHash = compressedBytes.hash()
 
         if (!compressedBytesHash.contentEquals(hashBytes)) {
-            throw IOException("Data corruption or tampering detected")
+            throw DatabaseDataCorruptionException()
         }
 
         return compressedBytes
@@ -46,9 +50,9 @@ class DatabaseIO {
         return MessageDigest.getInstance("SHA3-256").digest(this)
     }
 
-    private fun ByteArray.compress(compressionLevel: Int = 12): ByteArray {
+    private fun ByteArray.compress(): ByteArray {
         ByteArrayOutputStream().use { outputStream ->
-            ZstdOutputStream(outputStream, compressionLevel).use { zstdStream ->
+            ZstdOutputStream(outputStream, COMPRESSION_LEVEL).use { zstdStream ->
                 zstdStream.write(this)
             }
 
