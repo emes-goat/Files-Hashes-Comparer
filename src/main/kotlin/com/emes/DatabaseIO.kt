@@ -47,7 +47,7 @@ class DatabaseIO {
     }
 
     private fun ByteArray.hash(): ByteArray {
-        return MessageDigest.getInstance("SHA3-256").digest(this)
+        return MessageDigest.getInstance("SHA-256").digest(this)
     }
 
     private fun ByteArray.compress(): ByteArray {

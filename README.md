@@ -6,7 +6,7 @@ Especially useful for backups on filesystems which are not check summed like NTF
 So you can detect when file changed.
 
 - Stores hashes in CSV format in file `.hashes.csv` in selected directory
-- Calculates hashes using SHA3-256 algorithm
+- Calculates hashes using SHA-256 algorithm
 
 Build a .jar file:
 ```

@@ -17,8 +17,7 @@ class HashDB(
     private val log = KotlinLogging.logger {}
 
     val excludeFilesWith = listOf<(String) -> Boolean>(
-        { it -> it.startsWith(".") },
-        { it -> it.endsWith(".ods") }
+        { it -> it.startsWith(".") }
     )
 
     fun calculateAndCompare(

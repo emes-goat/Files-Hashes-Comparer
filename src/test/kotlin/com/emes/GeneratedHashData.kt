@@ -8,7 +8,7 @@ import kotlin.random.Random
 
 
 @State(Scope.Benchmark)
-open class GeneratedBatchData {
+open class GeneratedHashData {
 
     companion object {
         private const val FILE_SIZE = 1048576

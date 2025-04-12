@@ -8,11 +8,11 @@ import java.security.MessageDigest
 class SHA {
 
     companion object {
-        private const val HASH_ALGORITHM = "SHA3-256"
+        private const val HASH_ALGORITHM = "SHA-256"
         private const val BUFFER_SIZE = 256 * 1024
     }
 
-    private val sha3Digest = ThreadLocal.withInitial {
+    private val shaDigest = ThreadLocal.withInitial {
         MessageDigest.getInstance(HASH_ALGORITHM)
     }
     private val buffer = ThreadLocal.withInitial {
@@ -21,17 +21,17 @@ class SHA {
 
     @OptIn(ExperimentalStdlibApi::class)
     fun calculate(file: Path): String {
-        val sha3 = sha3Digest.get().apply { reset() }
+        val sha = shaDigest.get().apply { reset() }
         val buffer = buffer.get().apply { clear() }
 
         return FileChannel.open(file).use { channel ->
             while (channel.read(buffer) > 0) {
                 buffer.flip()
-                sha3.update(buffer)
+                sha.update(buffer)
                 buffer.clear()
             }
 
-            return sha3.digest().toHexString()
+            return sha.digest().toHexString()
         }
     }
 }

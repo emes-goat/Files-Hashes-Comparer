@@ -3,7 +3,6 @@ package com.emes
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertIterableEquals
 import org.junit.jupiter.api.Assertions.assertTrue
-import java.io.IOException
 import java.nio.file.NoSuchFileException
 import kotlin.io.path.Path
 import kotlin.io.path.writeBytes
@@ -47,7 +46,7 @@ class DatabaseIOTest {
 
         databaseFile.flipByteInFile(0)
 
-        assertThrows<IOException> { databaseIO.read(databaseFile) }
+        assertThrows<DatabaseDataCorruptionException> { databaseIO.read(databaseFile) }
     }
 
     @Test
@@ -58,7 +57,7 @@ class DatabaseIOTest {
 
         databaseFile.flipByteInFile(33) //Hash is first 32 bytes
 
-        assertThrows<IOException> { databaseIO.read(databaseFile) }
+        assertThrows<DatabaseDataCorruptionException> { databaseIO.read(databaseFile) }
     }
 
     @Test

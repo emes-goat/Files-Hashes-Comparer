@@ -13,7 +13,7 @@ open class HashBenchmark {
     @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
     @Measurement(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
     @Fork(value = 1)
-    fun sha2_jdk(blackhole: Blackhole, data: GeneratedBatchData) {
+    fun sha2_jdk(blackhole: Blackhole, data: GeneratedHashData) {
         val digest = MessageDigest.getInstance("SHA-256")
         for (fileBytes in data.filesToHash) {
             val hash = digest.digest(fileBytes)
@@ -27,7 +27,7 @@ open class HashBenchmark {
     @Warmup(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
     @Measurement(iterations = 5, time = 2, timeUnit = TimeUnit.SECONDS)
     @Fork(value = 1)
-    fun sha3_jdk(blackhole: Blackhole, data: GeneratedBatchData) {
+    fun sha3_jdk(blackhole: Blackhole, data: GeneratedHashData) {
         val digest = MessageDigest.getInstance("SHA3-256")
         for (fileBytes in data.filesToHash) {
             val hash = digest.digest(fileBytes)
