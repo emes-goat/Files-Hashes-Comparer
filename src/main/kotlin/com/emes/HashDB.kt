@@ -80,12 +80,12 @@ class HashDB {
                 .filter {
                     !it.fileName.toString().startsWith(HIDDEN_FILE_STARTS_WITH)
                 }
-                .toList()
-                .map { file ->
+                .map {
                     async(dispatcher) {
-                        FileHash(root.relativize(file), sha.calculate(file))
+                        FileHash(root.relativize(it), sha.calculate(it))
                     }
                 }
+                .toList()
                 .awaitAll()
         }
     }
