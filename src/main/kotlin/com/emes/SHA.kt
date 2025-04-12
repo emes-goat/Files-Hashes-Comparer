@@ -5,7 +5,7 @@ import java.nio.channels.FileChannel
 import java.nio.file.Path
 import java.security.MessageDigest
 
-class SHA3 {
+class SHA {
 
     companion object {
         private const val HASH_ALGORITHM = "SHA3-256"

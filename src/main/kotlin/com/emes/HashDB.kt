@@ -10,16 +10,13 @@ import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.io.path.walk
 
-class HashDB {
-
+class HashDB(
+    private val databaseIO: DatabaseIO = DatabaseIO(),
+    private val sha: SHA = SHA()
+) {
     private val log = KotlinLogging.logger {}
-    private val databaseIO = DatabaseIO()
-    private val sha3 = SHA3()
 
-    private val hashDispatcher =
-        Dispatchers.IO.limitedParallelism(Runtime.getRuntime().availableProcessors())
-
-    private val excludeFilesWith = listOf<(String) -> Boolean>(
+    val excludeFilesWith = listOf<(String) -> Boolean>(
         { it -> it.startsWith(".") },
         { it -> it.endsWith(".ods") }
     )
@@ -53,7 +50,7 @@ class HashDB {
 
     fun calculateForFile(file: Path): String {
         log.info { "Calculate hash for single file: $file" }
-        val hash = sha3.calculate(file)
+        val hash = sha.calculate(file)
         log.info { "Hash: $hash" }
         return hash
     }
@@ -77,17 +74,21 @@ class HashDB {
         }
     }
 
-    private fun calculateHashes(root: Path): List<FileHash> = runBlocking {
-        root.walk()
-            .filter { file ->
-                excludeFilesWith.none { it(file.fileName.toString()) }
-            }
-            .toList()
-            .map { file ->
-                async(hashDispatcher) {
-                    FileHash(root.relativize(file), sha3.calculate(file))
+    private fun calculateHashes(root: Path): List<FileHash> {
+        val dispatcher = Dispatchers.IO.limitedParallelism(Runtime.getRuntime().availableProcessors())
+
+        return runBlocking {
+            root.walk()
+                .filterNot { file ->
+                    excludeFilesWith.any { it(file.fileName.toString()) }
                 }
-            }
-            .awaitAll()
+                .toList()
+                .map { file ->
+                    async(dispatcher) {
+                        FileHash(root.relativize(file), sha.calculate(file))
+                    }
+                }
+                .awaitAll()
+        }
     }
 }
