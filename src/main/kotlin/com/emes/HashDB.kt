@@ -13,7 +13,7 @@ class HashDB {
 
     companion object {
         private const val HIDDEN_FILE_STARTS_WITH = '.'
-        private val N_CPU = Runtime.getRuntime().availableProcessors()
+        private val N_CPU = Runtime.getRuntime().availableProcessors() * 2
         private const val DATABASE_FILE_NAME = ".hashes"
     }
 
