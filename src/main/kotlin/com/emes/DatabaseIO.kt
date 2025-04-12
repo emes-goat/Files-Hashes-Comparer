@@ -14,7 +14,7 @@ import kotlin.io.path.writeBytes
 class DatabaseIO {
 
     companion object {
-        private const val SHA3_HASH_LENGTH_BITS = 32
+        private const val SHA_HASH_LENGTH_BITS = 32
         private const val COMPRESSION_LEVEL = 11
     }
 
@@ -33,8 +33,8 @@ class DatabaseIO {
             return emptyList()
         }
 
-        val hashBytes = rawBytes.copyOfRange(0, SHA3_HASH_LENGTH_BITS)
-        val compressedBytes = rawBytes.copyOfRange(SHA3_HASH_LENGTH_BITS, rawBytes.size)
+        val hashBytes = rawBytes.copyOfRange(0, SHA_HASH_LENGTH_BITS)
+        val compressedBytes = rawBytes.copyOfRange(SHA_HASH_LENGTH_BITS, rawBytes.size)
         val compressedBytesHash = compressedBytes.hash()
 
         if (!compressedBytesHash.contentEquals(hashBytes)) {
