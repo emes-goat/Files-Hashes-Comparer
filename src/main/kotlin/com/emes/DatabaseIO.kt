@@ -1,13 +1,13 @@
 package com.emes
 
 import Filehash
-import com.github.luben.zstd.ZstdInputStream
-import com.github.luben.zstd.ZstdOutputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.security.MessageDigest
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 
@@ -15,7 +15,7 @@ class DatabaseIO {
 
     companion object {
         private const val SHA_HASH_LENGTH_BITS = 32
-        private const val COMPRESSION_LEVEL = 11
+        private const val GZIP_BUFFER_SIZE = 8192
     }
 
     fun write(fileHashes: List<FileHash>, databaseFile: Path) {
@@ -52,18 +52,25 @@ class DatabaseIO {
 
     private fun ByteArray.compress(): ByteArray {
         ByteArrayOutputStream().use { outputStream ->
-            ZstdOutputStream(outputStream, COMPRESSION_LEVEL).use { zstdStream ->
-                zstdStream.write(this)
+            GZIPOutputStream(outputStream, GZIP_BUFFER_SIZE).apply {
+                write(this@compress)
+                close()
             }
-
             return outputStream.toByteArray()
         }
     }
 
     private fun ByteArray.decompress(): ByteArray {
         ByteArrayInputStream(this).use { inputStream ->
-            return ZstdInputStream(inputStream).use { zstdStream ->
-                zstdStream.readAllBytes()
+            GZIPInputStream(inputStream, GZIP_BUFFER_SIZE).use { gzipStream ->
+                ByteArrayOutputStream().use { outputStream ->
+                    val buffer = ByteArray(GZIP_BUFFER_SIZE)
+                    var bytesRead: Int
+                    while (gzipStream.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+                    }
+                    return outputStream.toByteArray()
+                }
             }
         }
     }
@@ -82,12 +89,13 @@ class DatabaseIO {
     }
 
     private fun ByteArray.deserialize(): List<FileHash> {
-        val protoList = Filehash.FileHashListProto.parseFrom(this)
-        return protoList.elementsList.map { proto ->
-            FileHash(
-                path = Paths.get(proto.path),
-                hash = proto.hash
-            )
-        }
+        return Filehash.FileHashListProto.parseFrom(this)
+            .elementsList
+            .map {
+                FileHash(
+                    path = Paths.get(it.path),
+                    hash = it.hash
+                )
+            }
     }
 }

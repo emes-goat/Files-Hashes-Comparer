@@ -1,6 +1,5 @@
 package com.emes
 
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -10,37 +9,37 @@ import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.io.path.walk
 
-class HashDB(
-    private val databaseIO: DatabaseIO = DatabaseIO(),
-    private val sha: SHA = SHA()
-) {
-    private val log = KotlinLogging.logger {}
+class HashDB {
 
-    val excludeFilesWith = listOf<(String) -> Boolean>(
-        { it -> it.startsWith(".") }
-    )
+    companion object {
+        private const val HIDDEN_FILE_STARTS_WITH = '.'
+        private val N_CPU = Runtime.getRuntime().availableProcessors()
+        private const val DATABASE_FILE_NAME = ".hashes"
+    }
+
+    private val databaseIO = DatabaseIO()
+    private val sha = SHA()
 
     fun calculateAndCompare(
-        directory: Path,
-        databaseFileName: String = ".hashes"
+        directory: Path
     ): List<FileHashChange> {
-        log.info { "Compare hashes in $directory" }
+        println("Compare hashes in $directory")
         val currentHashes = calculateHashes(directory)
-        val databaseFile = directory / databaseFileName
+        val databaseFile = directory / DATABASE_FILE_NAME
 
         val changedHashes = if (databaseFile.exists()) {
             val previousHashes = databaseIO.read(databaseFile)
             compareHashes(previousHashes, currentHashes)
         } else {
-            log.info { "File with previous hashes doesn't exist" }
+            println("File with previous hashes doesn't exist")
             emptyList()
         }
 
         when {
-            changedHashes.isEmpty() -> log.info { "OK - No changes detected" }
+            changedHashes.isEmpty() -> println("OK - No changes detected")
             else -> {
-                log.error { "HASH CHANGED!!!" }
-                changedHashes.forEach { log.error { it } }
+                println("HASH CHANGED!!!")
+                changedHashes.forEach { println(it) }
             }
         }
         databaseIO.write(currentHashes, databaseFile)
@@ -48,9 +47,9 @@ class HashDB(
     }
 
     fun calculateForFile(file: Path): String {
-        log.info { "Calculate hash for single file: $file" }
+        println("Calculate hash for single file: $file")
         val hash = sha.calculate(file)
-        log.info { "Hash: $hash" }
+        println("Hash: $hash")
         return hash
     }
 
@@ -74,12 +73,12 @@ class HashDB(
     }
 
     private fun calculateHashes(root: Path): List<FileHash> {
-        val dispatcher = Dispatchers.IO.limitedParallelism(Runtime.getRuntime().availableProcessors())
+        val dispatcher = Dispatchers.IO.limitedParallelism(N_CPU)
 
         return runBlocking {
             root.walk()
-                .filterNot { file ->
-                    excludeFilesWith.any { it(file.fileName.toString()) }
+                .filter {
+                    !it.fileName.toString().startsWith(HIDDEN_FILE_STARTS_WITH)
                 }
                 .toList()
                 .map { file ->

@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.*
 
 class SHA {
 
@@ -19,7 +20,6 @@ class SHA {
         ByteBuffer.allocateDirect(BUFFER_SIZE)
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     fun calculate(file: Path): String {
         val sha = shaDigest.get().apply { reset() }
         val buffer = buffer.get().apply { clear() }
@@ -31,7 +31,7 @@ class SHA {
                 buffer.clear()
             }
 
-            return sha.digest().toHexString()
+            return HexFormat.of().formatHex(sha.digest())
         }
     }
 }
